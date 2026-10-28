@@ -28,7 +28,7 @@ try {
           const id=randomUUID();unitIds.push(id);
           await sql.query('INSERT INTO units(id,tenant_id,code,name) VALUES($1,$2,$3,$4)',[id,tenant.id,unit.code,unit.name]);
         }
-        await sql.query('INSERT INTO products(tenant_id,code,name,specification,unit_id,attribute) VALUES($1,$2,$3,$4,$5,$6)',[tenant.id,'LOCAL001','本地验收样例产品-'+tenant.slug,'仅开发验收，不是参考系统业务数据',unitIds[0],'manufactured']);
+        await sql.query('INSERT INTO products(tenant_id,code,name,specification,unit_id,attribute) VALUES($1,$2,$3,$4,$5,$6)',[tenant.id,'LOCAL001','本地验收样例产品-'+tenant.slug,'Φ20×100',unitIds[0],'manufactured']);
       }
     });
     await mkdir(resolve(projectRoot,'.local'),{recursive:true});

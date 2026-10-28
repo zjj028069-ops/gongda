@@ -4,6 +4,7 @@ import {apiRequest,ApiError,errorMessage,hasPermission,type Session} from './api
 import {useRemote} from './masterTools';
 import {CommandKeys} from './commandKeys';
 import {Notice,Loading} from './shared';
+import { requestKey } from './requestKey';
 type Props={session:Session;revision:number;onExpired:()=>void;onChanged:()=>void};
 type Doc={id:string;code:string;version:number;approval:string;reason:string;quantity?:string;good_qty?:string;defect_qty?:string;source_report_id?:string;lines?:{id:string;product_id:string;quantity:string}[]};
 type Work={id:string;code:string;execution:string;tasks:{id:string;sequence:number;execution:string;process_id:string;process_name:string;approved_good:string;approved_scrap:string}[]};
@@ -22,7 +23,7 @@ export function ProductionCorrections(p:Props){
  const keys=useRef(new CommandKeys()),lock=useRef(false);
  async function send(path:string,body:Record<string,unknown>){
   if(lock.current)return;lock.current=true;setBusy(true);setError('');setInfo('');
-  const prepared=keys.current.prepare(path,{...body,request_key:crypto.randomUUID()});
+  const prepared=keys.current.prepare(path,{...body,request_key:requestKey()});
   try{await apiRequest(path,{method:'POST',body:prepared,csrfToken:p.session.csrf_token});keys.current.complete(path,prepared);setInfo('已保存，数量与来源已刷新。');p.onChanged();}
   catch(e){if(e instanceof ApiError&&e.status===401)p.onExpired();else setError(errorMessage(e));}finally{lock.current=false;setBusy(false);}
  }

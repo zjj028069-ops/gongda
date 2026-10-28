@@ -4,20 +4,22 @@ import { canWriteProducts } from './api';
 import type { Product } from './api';
 import { Loading, Notice } from './shared';
 import type { Bom, BomVersion, Route, RouteStep, RouteVersion, VersionInfo } from './masterTypes';
-import { decimalPattern, idText } from './masterTypes';
+import { idText } from './masterTypes';
 import { EditorShell, useMutation, useRemote } from './masterTools';
 import type { VersionFormProps } from './VersionForms';
+import { bomSavePayload, validateBomDraft } from './domain/payloads';
+import { requestKey } from './requestKey';
 
 type ProductOption = { id: string; code: string; name: string; unit_name: string };
 type BomDraft = { key: string; component_product_id: string; quantity: string; loss_rate: string; feeding_process_id: string; auto_issue: boolean; child_mode: 'auto' | 'leaf' | 'version'; child_version_id: string };
-const newLine = (): BomDraft => ({ key: crypto.randomUUID(), component_product_id: '', quantity: '1', loss_rate: '0', feeding_process_id: '', auto_issue: false, child_mode: 'auto', child_version_id: '' });
+const newLine = (): BomDraft => ({ key: requestKey(), component_product_id: '', quantity: '1', loss_rate: '0', feeding_process_id: '', auto_issue: false, child_mode: 'auto', child_version_id: '' });
 
 export function BomEditor({ record, source, session, revision, onExpired, onClose, onSaved }: VersionFormProps) {
   const bom = record as Bom | undefined;
   const original = source as BomVersion | undefined;
   const [parent, setParent] = useState(bom?.parent_product_id ?? '');
   const [description, setDescription] = useState(original?.version.description ?? '');
-  const [lines, setLines] = useState<BomDraft[]>(original?.items.map((item) => ({ key: crypto.randomUUID(), component_product_id: item.component_product_id, quantity: item.quantity, loss_rate: item.loss_rate, feeding_process_id: item.feeding_process_id ?? '', auto_issue: item.auto_issue, child_mode: item.component_bom_version_id ? 'version' : 'leaf', child_version_id: item.component_bom_version_id ?? '' })) ?? [newLine()]);
+  const [lines, setLines] = useState<BomDraft[]>(original?.items.map((item) => ({ key: requestKey(), component_product_id: item.component_product_id, quantity: item.quantity, loss_rate: item.loss_rate, feeding_process_id: item.feeding_process_id ?? '', auto_issue: item.auto_issue, child_mode: item.component_bom_version_id ? 'version' : 'leaf', child_version_id: item.component_bom_version_id ?? '' })) ?? [newLine()]);
   const [searchText, setSearchText] = useState('');
   const [query, setQuery] = useState('');
   const products = useRemote<{ items: Product[]; total: number }>(`/api/products?${new URLSearchParams({ q: query, page: '1', page_size: '100' })}`, revision, onExpired);
@@ -35,13 +37,13 @@ export function BomEditor({ record, source, session, revision, onExpired, onClos
   });
   useEffect(() => {
     if (!products.data) return;
-    setCache((current) => { const result = { ...current }; products.data?.items.forEach((item) => { result[idText(item.id)] = { id: idText(item.id), code: item.code, name: item.name, unit_name: item.unit_name }; }); return result; });
+    setCache((current) => { const result = { ...current }; products.data?.items.forEach((item) => { result[idText(item.id)] = { id: idText(item.id), code: item.code, name: item.name, unit_name: item.unit_name ?? '' }; }); return result; });
   }, [products.data]);
   useEffect(() => { if (routeDetail.data) setRouteVersionId(routeDetail.data.route.current_version_id); }, [routeDetail.data]);
   const mutation = useMutation(session, !!bom, onExpired, onSaved);
   const writable = canWriteProducts(session);
   const disabled = !writable || mutation.saving;
-  const productRows: ProductOption[] = (products.data?.items ?? []).filter((item) => item.active).map((item) => ({ id: idText(item.id), code: item.code, name: item.name, unit_name: item.unit_name }));
+  const productRows: ProductOption[] = (products.data?.items ?? []).filter((item) => item.active).map((item) => ({ id: idText(item.id), code: item.code, name: item.name, unit_name: item.unit_name ?? '' }));
   function choices(selectedId: string) { return selectedId && !productRows.some((item) => item.id === selectedId) && cache[selectedId] ? [cache[selectedId], ...productRows] : productRows; }
   function changeRoute(value: string) {
     setRouteId(value); setRouteVersionId(value === '__bound' ? original?.version.route_version_id ?? '' : '');
@@ -55,19 +57,13 @@ export function BomEditor({ record, source, session, revision, onExpired, onClos
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!writable) return;
-    if (!parent || !lines.length || lines.some((line) => !line.component_product_id)) { mutation.setError('请选择母件，并至少配置一个组件。'); return; }
-    if (lines.some((line) => line.component_product_id === parent)) { mutation.setError('母件不能直接包含自身；跨层级循环也会由服务校验。'); return; }
-    if (lines.some((line) => !decimalPattern.test(line.quantity) || Number(line.quantity) <= 0 || !decimalPattern.test(line.loss_rate) || Number(line.loss_rate) > 1)) { mutation.setError('用量需大于0，损耗率为0到1，均最多6位小数。'); return; }
     const steps = routeVersion.data?.steps ?? [];
-    if (lines.some((line) => line.auto_issue && (!routeVersionId || !line.feeding_process_id))) { mutation.setError('自动扣料配置必须绑定路线版本并指定其中的投料工序。'); return; }
-    if (lines.some((line) => line.feeding_process_id && !steps.some((step) => step.process_id === line.feeding_process_id))) { mutation.setError('投料工序必须属于当前绑定路线版本。'); return; }
-    if (lines.some((line) => line.child_mode === 'version' && !line.child_version_id)) { mutation.setError('固定子BOM版本时必须选择具体版本；也可改为自动冻结或叶子不展开。'); return; }
-    const items = lines.map((line) => ({ component_product_id: line.component_product_id, quantity: line.quantity, loss_rate: line.loss_rate, feeding_process_id: line.feeding_process_id || null, auto_issue: line.auto_issue, ...(line.child_mode === 'leaf' ? { component_bom_version_id: null } : line.child_mode === 'version' ? { component_bom_version_id: line.child_version_id } : {}) }));
-    const fields = { description: description.trim(), route_version_id: routeVersionId || null, items };
-    void mutation.save(bom ? `/api/boms/${encodeURIComponent(idText(bom.id))}/versions` : '/api/boms', bom ? { ...fields, expected_version: bom.version } : { ...fields, parent_product_id: parent });
+    const invalid = validateBomDraft({ parent, lines, routeVersionId, steps });
+    if (invalid) { mutation.setError(invalid); return; }
+    void mutation.save(bom ? `/api/boms/${encodeURIComponent(idText(bom.id))}/versions` : '/api/boms', bomSavePayload({ existing: !!bom, parent, description, routeVersionId, lines, expected_version: bom?.version }));
   }
   return <EditorShell title={bom ? 'BOM · 新修订' : '新增产品BOM'} tenant={session.tenant.name} wide onClose={onClose} saving={mutation.saving} error={mutation.error} conflict={mutation.conflict} onSubmit={writable ? submit : undefined} submitLabel={bom ? '保存为新版本' : '创建BOM'} submitDisabled={products.loading || !!products.error || routes.loading || !!routes.error || routeDetail.loading || !!routeDetail.error || routeVersion.loading || !!routeVersion.error || (!!routeId && !routeVersionId)}>
-    <Notice kind="info">历史BOM及子版本保持只读。用量与损耗率分别填写：用量1.03就是1.03个单位，不解释为损耗。自动扣料这里只保存配置，实际领料台账尚未开放。</Notice>
+    <Notice kind="info">历史BOM及子版本保持只读。用量与损耗率分别填写：用量1.03就是1.03个单位，不解释为损耗。自动扣料这里只保存配置。</Notice>
     <div className="product-picker-search"><label className="form-field"><span>检索可选产品</span><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="输入编号或名称缩小范围" disabled={disabled} /></label><button type="button" className="button button-secondary" disabled={products.loading || disabled} onClick={() => { setQuery(searchText.trim()); products.reload(); }}>搜索产品</button></div>
     {products.error && <Notice>{products.error}</Notice>}{products.data && <p className="muted small">本次返回 {products.data.items.length} / 匹配 {products.data.total} 个产品{products.data.total > products.data.items.length ? '。最多取100条，请通过编号或名称搜索缩小范围，未返回产品没有被纳入当前选项。' : '。'}</p>}
     <div className="form-grid"><label className="form-field"><span>母件产品 *</span><select required value={parent} disabled={disabled || !!bom || products.loading} onChange={(event) => setParent(event.target.value)}><option value="">请选择母件</option>{choices(parent).map((item) => <option value={item.id} key={item.id}>{item.code} · {item.name}</option>)}</select></label><label className="form-field"><span>版本说明</span><input value={description} onChange={(event) => setDescription(event.target.value)} disabled={disabled} /></label><label className="form-field"><span>投料路线</span><select value={routeId} disabled={disabled || routes.loading} onChange={(event) => changeRoute(event.target.value)}><option value="">不绑定路线</option>{original?.version.route_version_id && <option value="__bound">保持原冻结路线版本</option>}{routes.data?.items.filter((route) => route.active).map((route) => <option value={idText(route.id)} key={route.id}>{route.code} · {route.name}</option>)}</select></label><label className="form-field"><span>冻结路线版本</span><select value={routeVersionId} disabled={disabled || !routeId || routeDetail.loading} onChange={(event) => changeRouteVersion(event.target.value)}><option value="">未绑定</option>{routeId === '__bound' && original?.version.route_version_id && <option value={original.version.route_version_id}>原冻结版本 · {original.version.route_version_id}</option>}{routeDetail.data?.versions.map((version) => <option value={version.id} key={version.id}>R{version.revision} · {version.description || '无说明'}</option>)}</select></label></div>

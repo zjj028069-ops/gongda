@@ -77,7 +77,7 @@ try{
  const units=(await api('/api/units')).items;
  const members=(await api('/api/team-members')).items;
  const worker=members.find(m=>m.role==='worker');assert.ok(worker,'验收企业需要本地工人');
- async function product(code,name,unitCode,attribute){const found=(await api('/api/products?q='+encodeURIComponent(code)+'&page_size=100')).items.find(p=>p.code===code);if(found)return found;const unit=units.find(u=>u.code===unitCode&&u.active);assert.ok(unit);return (await api('/api/products',{code,name,unit_id:unit.id,attribute,specification:'第二步本地合成验收数据；不是参考站的业务记录'})).product;}
+ async function product(code,name,unitCode,attribute){const found=(await api('/api/products?q='+encodeURIComponent(code)+'&page_size=100')).items.find(p=>p.code===code);if(found)return found;const unit=units.find(u=>u.code===unitCode&&u.active);assert.ok(unit);return (await api('/api/products',{code,name,unit_id:unit.id,attribute,specification:'Φ20×100'})).product;}
  const parent=await product('S2-FG','第二步验收餐车','EA','manufactured');
  const steel=await product('S2-STEEL','验收钢板','M','purchased');
  const caster=await product('S2-CASTER','验收脚轮','EA','purchased');

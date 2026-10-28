@@ -152,7 +152,7 @@ test('费用预览100元按2:1准确66.67/33.33，只在审批时过账并进入
  for(const proc of procs)await post('/api/wage-rules',{request_key:key(),code:code('WG'),mode:'piece',rate:'1',process_ids:[proc.id],product_id:fg.id});
  for(const wo of [wo1,wo2]){
   await approveIssue(await issue(wo));await act('/api/work-orders/'+wo.id+'/actions',{version:(await reload(wo.id)).version,action:'start'});
-  for(let i=0;i<4;i++){const task=(await reload(wo.id)).tasks.find((t:any)=>t.execution==='running'),rp=(await reportGood(task.id,'1',a,{effective_seconds:60})).report;await approveReport(rp.id,rp.version);}
+  for(let i=0;i<4;i++){let current=await reload(wo.id);let task=current.tasks.find((t:any)=>t.execution==='running');if(!task){const next=current.tasks.find((t:any)=>t.execution==='not_started');current=(await act('/api/work-orders/'+wo.id+'/tasks/'+next.id+'/actions',{action:'start',version:next.version})).work_order;task=current.tasks.find((t:any)=>t.id===next.id);}const rp=(await reportGood(task.id,'1',a,{effective_seconds:60})).report;await approveReport(rp.id,rp.version);}
  }
  const body=input([{work_order_id:wo1.id,weight:'2'},{work_order_id:wo2.id,weight:'1'}]);
  mainExpense=(await post('/api/expenses',body)).expense;assert.equal(mainExpense.state,'pending');assert.equal(mainExpense.events.length,0);

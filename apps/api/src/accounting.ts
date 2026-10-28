@@ -3,14 +3,23 @@ import { Problem, type Actor } from './services.js';
 import { qty, rate, round, lineCents, money } from './business-common.js';
 
 export type WageSnapshot={status:'priced'|'unpriced';mode?:string;rule_id?:string;rule_version_id?:string;rate?:string;good_qty:string;effective_seconds:number;amount_cents:string|null;amount:string|null;engine_version:string;reason?:string;worker_name?:string;worker_id?:string};
-export async function freezeWage(sql:Sql,productId:string,processId:string,good:string,seconds:number,bound?:string|null):Promise<WageSnapshot>{
+export type TaskPrice={mode:string;rate:string|null};
+export function priceWage(mode:string,price:string,good:string,seconds:number){
+ return mode==='time'?round(BigInt(seconds)*rate(price),360_000_000n):lineCents(qty(good),price);
+}
+export async function freezeWage(sql:Sql,productId:string,processId:string,good:string,seconds:number,bound?:string|null,taskPrice?:TaskPrice|null):Promise<WageSnapshot>{
+ const base={good_qty:good,effective_seconds:seconds,engine_version:'wage-decimal-v1'};
+ if(taskPrice&&taskPrice.rate!==null&&taskPrice.rate!==undefined){
+  const amount=priceWage(taskPrice.mode,taskPrice.rate,good,seconds);
+  return {...base,status:'priced',mode:taskPrice.mode,rate:taskPrice.rate,amount_cents:amount.toString(),amount:money(amount)};
+ }
  const candidates=(await sql.query<{id:string;version_id:string;product_id:string|null;rate:string;mode:string}>('SELECT r.id,v.id AS version_id,r.product_id,v.rate::text,v.mode FROM wage_rules r JOIN wage_rule_versions v ON v.tenant_id=r.tenant_id AND v.rule_id=r.id AND v.revision=r.current_revision WHERE r.active AND $1=ANY(r.process_ids) AND (r.product_id=$2 OR r.product_id IS NULL)',[processId,productId])).rows;
  if(bound){const version=(await sql.query<{id:string;rule_id:string;product_id:string|null;rate:string;mode:string;process_ids:string[]}>('SELECT *,rate::text FROM wage_rule_versions WHERE id=$1',[bound])).rows[0];if(!version||!version.process_ids.includes(processId)||(version.product_id&&version.product_id!==productId))throw new Problem(422,'WAGE_RULE_SCOPE','任务工价快照与产品或工序不匹配');candidates.splice(0,candidates.length,{id:version.rule_id,version_id:version.id,product_id:version.product_id,rate:version.rate,mode:version.mode});}
  const specific=candidates.filter(r=>r.product_id===productId),matches=specific.length?specific:candidates;
  if(matches.length>1)throw new Problem(409,'WAGE_RULE_CONFLICT','同层工价规则重叠，请先消除冲突');
- const chosen=matches[0],base={good_qty:good,effective_seconds:seconds,engine_version:'wage-decimal-v1'};
+ const chosen=matches[0];
  if(!chosen)return {...base,status:'unpriced',amount_cents:null,amount:null,reason:'没有适用的工价规则'};
- const amount=chosen.mode==='piece'?lineCents(qty(good),chosen.rate):round(BigInt(seconds)*rate(chosen.rate),360_000_000n);
+ const amount=priceWage(chosen.mode,chosen.rate,good,seconds);
  return {...base,status:'priced',rule_id:chosen.id,rule_version_id:chosen.version_id,mode:chosen.mode,rate:chosen.rate,amount_cents:amount.toString(),amount:money(amount)};
 }
 export async function wageView(sql:Sql,id:string,a:Actor){
@@ -20,17 +29,19 @@ export async function wageView(sql:Sql,id:string,a:Actor){
  return read?{wage_status:row.wage_status,estimated_wage:row.wage_snapshot?.amount??null,wage_snapshot:row.wage_snapshot}:{wage_status:row.wage_status,estimated_wage:null};
 }
 export async function postWage(sql:Sql,a:Actor,id:string,reverse=false){
- const r=(await sql.query<{work_order_id:string;operator_id:string;wage_snapshot:WageSnapshot|null}>('SELECT work_order_id,operator_id,wage_snapshot FROM production_reports WHERE id=$1',[id])).rows[0]!;
- const key=(reverse?'wage_reverse:':'wage:')+id;
- if((await sql.query('SELECT id FROM wage_events WHERE event_key=$1',[key])).rows[0])return;
+ const r=(await sql.query<{work_order_id:string;operator_id:string;wage_snapshot:WageSnapshot|null;settlement_status:string;version:number}>('SELECT work_order_id,operator_id,wage_snapshot,settlement_status,version FROM production_reports WHERE id=$1',[id])).rows[0]!;
+ if(r.settlement_status==='settled')throw new Problem(409,'SETTLED','已结算的报工记录不能修改或删除，请先改为未结算');
+ const positive=r.version<=1?'wage:'+id:'wage:'+id+':v'+r.version;
+ const negative=r.version<=1?'wage_reverse:'+id:'wage_reverse:'+id+':v'+r.version;
  if(reverse){
-  const original=(await sql.query<{id:string;amount_cents:string;calculation_snapshot:WageSnapshot}>('SELECT id,amount_cents::text,calculation_snapshot FROM wage_events WHERE event_key=$1',['wage:'+id])).rows[0];
+  if((await sql.query('SELECT id FROM wage_events WHERE event_key=$1',[negative])).rows[0])return;
+  const original=(await sql.query<{id:string;amount_cents:string;calculation_snapshot:WageSnapshot}>('SELECT id,amount_cents::text,calculation_snapshot FROM wage_events WHERE event_key=$1',[positive])).rows[0];
   if(!original)return;
-  if((await sql.query("SELECT l.id FROM wage_settlement_lines l JOIN wage_settlements s ON s.tenant_id=l.tenant_id AND s.id=l.settlement_id WHERE l.wage_event_id=$1 AND s.state='approved' LIMIT 1",[original.id])).rows[0])throw new Problem(409,'DOWNSTREAM_EXISTS','工资已结算，先冲销结算或走授权更正');
   if((await sql.query("SELECT id FROM fg_receipts WHERE work_order_id=$1 AND approval='approved' LIMIT 1",[r.work_order_id])).rows[0])throw new Problem(409,'DOWNSTREAM_EXISTS','人工成本已经结转成品，须先处理入库成本');
-  await sql.query('INSERT INTO wage_events(tenant_id,report_id,work_order_id,worker_id,event_key,amount_cents,calculation_snapshot,reversal_of,created_by,worker_name) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)',[a.tenant_id,id,r.work_order_id,r.operator_id,key,(-BigInt(original.amount_cents)).toString(),JSON.stringify(original.calculation_snapshot),original.id,a.user_id,original.calculation_snapshot.worker_name??r.operator_id]);
+  await sql.query('INSERT INTO wage_events(tenant_id,report_id,work_order_id,worker_id,event_key,amount_cents,calculation_snapshot,reversal_of,created_by,worker_name) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)',[a.tenant_id,id,r.work_order_id,r.operator_id,negative,(-BigInt(original.amount_cents)).toString(),JSON.stringify(original.calculation_snapshot),original.id,a.user_id,original.calculation_snapshot.worker_name??r.operator_id]);
  }else if(r.wage_snapshot?.status==='priced'){
-  await sql.query('INSERT INTO wage_events(tenant_id,report_id,work_order_id,worker_id,event_key,amount_cents,calculation_snapshot,created_by,worker_name) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)',[a.tenant_id,id,r.work_order_id,r.operator_id,key,r.wage_snapshot.amount_cents,JSON.stringify(r.wage_snapshot),a.user_id,r.wage_snapshot.worker_name??r.operator_id]);
+  if((await sql.query('SELECT id FROM wage_events WHERE event_key=$1',[positive])).rows[0])return;
+  await sql.query('INSERT INTO wage_events(tenant_id,report_id,work_order_id,worker_id,event_key,amount_cents,calculation_snapshot,created_by,worker_name) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)',[a.tenant_id,id,r.work_order_id,r.operator_id,positive,r.wage_snapshot.amount_cents,JSON.stringify(r.wage_snapshot),a.user_id,r.wage_snapshot.worker_name??r.operator_id]);
  }
 }
 export async function workCosts(sql:Sql,id:string){
@@ -73,6 +84,9 @@ export async function reverseTrade(sql:Sql,a:Actor,eventKey:string){
 export async function shipmentTrade(sql:Sql,a:Actor,eventKey:string,reverse=false){
  const lineId=eventKey.split(':')[1]!;
  if(reverse)return reverseTrade(sql,a,'shipment:'+lineId);
- const line=(await sql.query<{shipment_id:string;quantity:string;unit_price:string;customer_id:string}>('SELECT l.shipment_id,l.quantity::text,s.unit_price::text,o.customer_id FROM shipment_lines l JOIN sales_order_lines s ON s.tenant_id=l.tenant_id AND s.id=l.sales_line_id JOIN sales_orders o ON o.tenant_id=s.tenant_id AND o.id=s.order_id WHERE l.id=$1',[lineId])).rows[0]!;
- return tradeSource(sql,a,{kind:'receivable',partyId:line.customer_id,sourceType:'shipment',sourceId:line.shipment_id,eventKey:'shipment:'+lineId,amount:lineCents(qty(line.quantity),line.unit_price)});
+  const line=(await sql.query<{shipment_id:string;quantity:string;unit_price:string;amount_cents:string|null;customer_id:string}>('SELECT l.shipment_id,l.quantity::text,CASE WHEN l.contract_line_id IS NOT NULL THEN l.unit_price ELSE s.unit_price END::text AS unit_price,l.amount_cents::text,coalesce(sh.customer_id,o.customer_id) AS customer_id FROM shipment_lines l JOIN shipments sh ON sh.tenant_id=l.tenant_id AND sh.id=l.shipment_id LEFT JOIN sales_order_lines s ON s.tenant_id=l.tenant_id AND s.id=l.sales_line_id LEFT JOIN sales_orders o ON o.tenant_id=s.tenant_id AND o.id=sh.sales_order_id WHERE l.id=$1',[lineId])).rows[0]!;
+  if(!line?.customer_id)throw new Problem(422,'INVALID_REFERENCE','销售出库缺少客户');
+  const cents=line.amount_cents===null?null:BigInt(line.amount_cents);
+  const amount=cents!==null&&cents>0n?cents:lineCents(qty(line.quantity),line.unit_price);
+  return tradeSource(sql,a,{kind:'receivable',partyId:line.customer_id,sourceType:'shipment',sourceId:line.shipment_id,eventKey:'shipment:'+lineId,amount});
 }

@@ -66,7 +66,6 @@ export function registerPlatform(app:FastifyInstance,s:Services,options:{allowTe
  app.post<{Body:MemberBody}>('/api/platform/members',{preHandler:manage,schema:{body:object(['username','display_name','password','role'],{username:{type:'string',minLength:3,maxLength:80,pattern:'^[a-zA-Z0-9_.@-]+$'},password:{type:'string',minLength:12,maxLength:128},...memberProps})}},async(r,reply)=>{
   const password=await hashPassword(r.body.password);
   const member=await db.identity(context(r),async sql=>{
-   await sql.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['tenant-admins:'+actor(r).tenant_id]);
    const a=actor(r);requireAllScope(a);const b=r.body;await toTenant(sql);await gateTenantWrite(sql,context(r),'seats');await department(sql,b.department_id);await customRole(sql,b.custom_role_id,b.role);await toIdentity(sql);
    const u=(await sql.query<{id:string}>('INSERT INTO users(username,display_name,password_hash) VALUES($1,$2,$3) RETURNING id',[b.username,b.display_name,password])).rows[0]!;
    await sql.query('INSERT INTO memberships(tenant_id,user_id,role) VALUES($1,$2,$3)',[a.tenant_id,u.id,b.role]);await toTenant(sql);
@@ -75,13 +74,12 @@ export function registerPlatform(app:FastifyInstance,s:Services,options:{allowTe
   });return reply.code(201).send({member});
  });
  app.patch<{Params:{id:string};Body:{version:number;display_name:string;role:Role;active:boolean;department_id:string|null;custom_role_id:string|null}}>('/api/platform/members/:id',{preHandler:manage,schema:{params,body:object(['version','display_name','role','active','department_id','custom_role_id'],{version,...memberProps,active:{type:'boolean'}})}},r=>db.identity(context(r),async sql=>{
-  await sql.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['tenant-admins:'+actor(r).tenant_id]);
   const a=actor(r);requireAllScope(a);const b=r.body;await toTenant(sql);await gateTenantWrite(sql,context(r));await department(sql,b.department_id);await customRole(sql,b.custom_role_id,b.role);
   const all=await getMembers(sql);const before=all.find(m=>m.id===r.params.id);if(!before)throw new Problem(404,'MEMBER_NOT_FOUND','成员不存在');if(before.version!==b.version)throw new Problem(409,'VERSION_CONFLICT','成员已被修改，请刷新');
   if(a.user_id===before.id&&(!b.active||b.role!==before.role||b.custom_role_id!==before.custom_role_id))throw new Problem(409,'SELF_ADMIN_PROTECTION','不能停用或降权当前管理员，请由另一名管理员操作');
   if(before.active&&before.role==='admin'&&!before.custom_role_id&&(!b.active||b.role!=='admin'||b.custom_role_id)&&all.filter(m=>m.active&&m.role==='admin'&&!m.custom_role_id).length<=1)throw new Problem(409,'LAST_ADMIN','至少保留一名启用管理员');
   if(!before.active&&b.active){await toTenant(sql);await gateTenantWrite(sql,context(r),'seats');await toIdentity(sql);}
-  await sql.query('UPDATE memberships SET role=$1,active=$2,control_version=control_version+1 WHERE user_id=$3 AND tenant_id=$4',[b.role,b.active,before.id,a.tenant_id]);
+  await sql.query('UPDATE memberships SET role=$1,active=$2 WHERE user_id=$3 AND tenant_id=$4',[b.role,b.active,before.id,a.tenant_id]);
   if(!b.active||before.role!==b.role||before.custom_role_id!==b.custom_role_id){await sql.exec('SET LOCAL ROLE gd_auth');await sql.query('DELETE FROM sessions WHERE user_id=$1 AND tenant_id=$2',[before.id,a.tenant_id]);}
   await toTenant(sql);const member=(await sql.query('INSERT INTO tenant_member_profiles(tenant_id,user_id,display_name,department_id,custom_role_id,version) VALUES($1,$2,$3,$4,$5,2) ON CONFLICT(tenant_id,user_id) DO UPDATE SET display_name=EXCLUDED.display_name,department_id=EXCLUDED.department_id,custom_role_id=EXCLUDED.custom_role_id,version=tenant_member_profiles.version+1,updated_at=now() RETURNING *',[a.tenant_id,before.id,b.display_name,b.department_id,b.custom_role_id])).rows[0]!;
   const result={id:before.id,username:before.username,display_name:member.display_name,department_id:member.department_id,custom_role_id:member.custom_role_id,role:b.role,active:b.active,version:member.version};await writeAudit(sql,a,'member.updated','member',before.id,before,result);return {member:result};

@@ -5,8 +5,9 @@ import {gateTenantWrite} from './assets.js';
 import {shape,idParams,uuid,qtyField,keyField,versionField,reasonField,qty,formatDecimal,round,permit,reason,digest,replay,finish,nextCode,warehouse} from './business-common.js';
 import {postStock} from './inventory.js';
 import {freezeWage,type WageSnapshot} from './accounting.js';
+import {applyPerformance,matchPerformance} from './performance-pay.js';
 import {refreshTaskQuantities,assertOperator} from './production.js';
-type Task={id:string;work_order_id:string;process_id:string;product_id:string;warehouse_id:string;plan_qty:string;unit_ratio:string;execution:string;order_execution:string;sequence:number;wage_rule_version_id:string|null};
+type Task={id:string;work_order_id:string;process_id:string;product_id:string;warehouse_id:string;plan_qty:string;unit_ratio:string;execution:string;order_execution:string;sequence:number;wage_rule_version_id:string|null;pricing_mode:string;wage_rate:string|null};
 async function task(sql:Sql,id:string){const t=(await sql.query<Task>('SELECT t.*,t.plan_qty::text,t.unit_ratio::text,w.product_id,w.warehouse_id,w.execution AS order_execution FROM work_order_tasks t JOIN work_orders w ON w.tenant_id=t.tenant_id AND w.id=t.work_order_id WHERE t.id=$1 FOR UPDATE OF t,w',[id])).rows[0];if(!t)throw new Problem(404,'TASK_NOT_FOUND','任务不存在');if(['cancelled','completed'].includes(t.order_execution))throw new Problem(409,'STATE_TRANSITION','已完工或取消加工单不能修改投入与返工');return t;}
 export function registerCorrections(app:FastifyInstance,s:Services){
  const guard=s.authorize();const run=<T>(r:Parameters<Services['context']>[0],fn:(sql:Sql,a:Actor)=>Promise<T>)=>s.database.tenant(s.context(r),async sql=>{const a=s.actor(r);requireAllScope(a);await gateTenantWrite(sql,s.context(r));return fn(sql,a);});
@@ -35,9 +36,15 @@ export function registerCorrections(app:FastifyInstance,s:Services){
   const t=await task(sql,source.task_id);if(t.execution!=='running'||t.order_execution!=='running')throw new Problem(409,'STATE_TRANSITION','只有执行中的源任务可提交返工结果');
   const n=qty(b.good_qty)+qty(b.defect_qty),used=qty((await sql.query<{n:string}>("SELECT coalesce(sum(good_qty+defect_qty),0)::text AS n FROM rework_reports WHERE source_report_id=$1 AND approval IN ('pending','approved')",[source.id])).rows[0]!.n);
   if(n<=0n||used+n>qty(source.rework_qty))throw new Problem(422,'OVER_REWORK','返工结果数量不能超过该来源尚未处理的返工量');
-  const operator=b.operator_id??a.user_id;await assertOperator(sql,a,t.process_id,operator);const wage=await freezeWage(sql,t.product_id,t.process_id,b.good_qty,b.effective_seconds??0,t.wage_rule_version_id);
+  const operator=b.operator_id??a.user_id;await assertOperator(sql,a,t.process_id,operator);
+  const process=(await sql.query<{name:string;pricing_mode:string}>('SELECT name,pricing_mode FROM processes WHERE id=$1',[t.process_id])).rows[0];
+  const product=(await sql.query<{name:string;code:string;specification:string}>('SELECT name,code,specification FROM products WHERE id=$1',[t.product_id])).rows[0];
+  const operatorName=(await sql.query<{display_name:string}>('SELECT display_name FROM tenant_team_members WHERE id=$1',[operator])).rows[0]!.display_name;
+  const perf=await matchPerformance(sql,{processName:process?.name??'',pricingMode:t.pricing_mode==='time'?'计时':'计件',productName:product?.name??'',productCode:product?.code??'',productSpec:product?.specification??'',userName:operatorName});
+  const wage=await freezeWage(sql,t.product_id,t.process_id,b.good_qty,b.effective_seconds??0,t.wage_rule_version_id,perf?{mode:t.pricing_mode,rate:perf.wage_rate}:(t.wage_rate!=null?{mode:t.pricing_mode,rate:String(t.wage_rate)}:null));
+  if(perf)applyPerformance(wage as Record<string,unknown>,perf,{good:b.good_qty,defect:b.defect_qty,total:String(Number(b.good_qty)+Number(b.defect_qty)),seconds:b.effective_seconds??0,pricingMode:t.pricing_mode});
   if(wage.mode==='time'&&!(b.effective_seconds??0))throw new Problem(422,'TIME_REQUIRED','计时返工必须填写有效工时');
-  wage.worker_id=operator;wage.worker_name=(await sql.query<{display_name:string}>('SELECT display_name FROM tenant_team_members WHERE id=$1',[operator])).rows[0]!.display_name;
+  wage.worker_id=operator;wage.worker_name=operatorName;
   const id=(await sql.query<{id:string}>('INSERT INTO rework_reports(tenant_id,code,source_report_id,work_order_id,task_id,operator_id,good_qty,defect_qty,effective_seconds,wage_snapshot,reason,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id',[a.tenant_id,await nextCode(sql,a,'RW'),source.id,t.work_order_id,t.id,operator,b.good_qty,b.defect_qty,b.effective_seconds??0,wage,b.reason,a.user_id])).rows[0]!.id;
   await finish(sql,a,'rework.create',b.request_key,h,'rework_report',id);const v=await views(sql,'rework',id,a);await writeAudit(sql,a,'rework.create','rework_report',id,null,{...v,wage_snapshot:undefined});return reply.code(201).send({rework:v,replayed:false});
  }));

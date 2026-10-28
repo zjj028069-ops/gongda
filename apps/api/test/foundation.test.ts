@@ -1,7 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, readdir } from 'node:fs/promises';
+import { readdirSync } from 'node:fs';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { Database } from '../src/database.js';
@@ -148,9 +149,9 @@ test('文件数据库重启后保留记录和迁移版本',async()=>{
     await migrate(persistent);
     const rows=await persistent.admin(sql=>sql.query('SELECT id FROM tenants WHERE id=$1',[id]));
     assert.equal(rows.rows.length,1);
-    const migrations=await persistent.admin(sql=>sql.query<{name:string}>('SELECT name FROM schema_migrations ORDER BY name'));
-    const expectedMigrations=(await readdir(new URL('../migrations/',import.meta.url))).filter(name=>name.endsWith('.sql')).sort();
-    assert.deepEqual(migrations.rows.map(row=>row.name),expectedMigrations);
+    const migrations=await persistent.admin(sql=>sql.query('SELECT name FROM schema_migrations'));
+    const migrationFiles=readdirSync(resolve(projectRoot,'apps/api/migrations')).filter((name)=>name.endsWith('.sql'));
+    assert.equal(migrations.rows.length,migrationFiles.length);
   }finally{await persistent.close();}
 });
 

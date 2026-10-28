@@ -7,12 +7,22 @@ apps/*/dist/
 coverage/
 *.log
 
-# Local packaging, temporary output and private key material
-tmp/
-output/
-outputs/
+# Local runtime data and credentials must stay local
 *.pem
 *.key
 *.p12
 *.pfx
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Local packaging, temporary output
+tmp/
+output/
+outputs/
 .DS_Store
+
+# 第十一轮原版参考包只放仓库外工作目录，禁止提交
+docs/kgd-reference/round11
+docs/kgd-reference/round11/

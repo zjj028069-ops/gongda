@@ -10,6 +10,8 @@ export interface Session {
   permissions: string[];
   data_scope: 'all' | 'department' | 'self';
   department_id: string | null;
+  points?: string[] | null;
+  point_scopes?: Record<string, 'self' | 'team' | 'all'>;
 }
 
 export interface Unit {
@@ -18,6 +20,7 @@ export interface Unit {
   name: string;
   active?: boolean;
   version?: number;
+  sort?: number;
 }
 
 export interface Product {
@@ -25,14 +28,35 @@ export interface Product {
   code: string;
   name: string;
   specification: string | null;
-  unit_id: EntityId;
-  unit_name: string;
-  attribute: 'manufactured' | 'purchased';
+  unit_id: EntityId | null;
+  unit_name: string | null;
+  attribute: 'manufactured' | 'purchased' | 'outsourced' | null;
+  source?: '自产' | '外协加工' | '外购' | null;
   active: boolean;
   version: number;
   created_at: string;
   department_id?: string | null;
   created_by_id?: string | null;
+  category_id?: string | null;
+  category_name?: string | null;
+  sale_price?: string | null;
+  cost_price?: string | null;
+  outsource_price?: string | null;
+  commission_amount?: string | null;
+  commission_rate?: string | null;
+  inspection_spec_id?: string | null;
+  inspection_spec_name?: string | null;
+  default_supplier_id?: string | null;
+  supplier_name?: string | null;
+  stale_days?: string | null;
+  stock_upper_warn?: string | null;
+  stock_lower_warn?: string | null;
+  remark?: string | null;
+  intro_html?: string | null;
+  images?: string[];
+  attachments?: string[];
+  creator_name?: string | null;
+  has_route?: boolean;
   extension?: { schema_version_id: string; revision: number; values: Record<string, unknown> } | null;
 }
 
@@ -56,7 +80,7 @@ export interface OverviewData {
 }
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) {
+  constructor(public readonly status: number, public readonly code: string, message: string, public readonly field?: string) {
     super(message);
     this.name = 'ApiError';
   }
@@ -89,11 +113,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const failure = payload as { error?: { code?: string; message?: string } } | null;
+    const failure = payload as { error?: { code?: string; message?: string; field?: string } } | null;
+    if (!failure?.error?.message) console.warn('API request failed', response.status, path);
     throw new ApiError(
       response.status,
       failure?.error?.code ?? `HTTP_${response.status}`,
-      failure?.error?.message ?? `服务请求失败（${response.status}），请重试。`,
+      failure?.error?.message ?? '网络或服务异常，请稍后重试',
+      failure?.error?.field,
     );
   }
   if (payload === null && response.status !== 204) {
@@ -112,6 +138,11 @@ export function errorMessage(error: unknown): string {
 
 export function hasPermission(session: Session, permission: string): boolean {
   return Array.isArray(session.permissions) && session.permissions.includes(permission);
+}
+
+export function hasPoint(session: Session, point: string): boolean {
+  if (!Array.isArray(session.points)) return true;
+  return session.points.includes(point);
 }
 
 export function canWriteProducts(session: Session): boolean {

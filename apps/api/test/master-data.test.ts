@@ -119,13 +119,15 @@ test('已启用产品引用的单位不能停用，跨企业单位ID不能修改
   assert.equal(foreign.statusCode, 404);
 });
 
-test('工序必须授权至少一位本企有效成员，停用/外企用户均不能加入', async () => {
+test('工序允许空生产人员；停用/外企用户均不能加入', async () => {
   const members = (await get('/api/team-members')).items;
   assert.ok(members.some((member: { id: string }) => member.id === worker));
   for (const id of [foreignMember, inactiveMember, disabledUser]) assert.ok(!members.some((member: { id: string }) => member.id === id));
   const base = { code: code('BADGX'), name: '工序', standard_minutes: '0.1', reporter_ids: [worker] };
-  await post('/api/processes', { ...base, reporter_ids: [] }, a, 400);
-  for (const id of [foreignMember, inactiveMember, disabledUser, randomUUID()]) await post('/api/processes', { ...base, reporter_ids: [id] }, a, 422);
+  // WHY: Round11 intentional API contract — masters.ts allows empty reporter_ids so craft forms can create a process then assign reporters later. Still assert 停用/外企 cannot be added.
+  const empty = await post('/api/processes', { ...base, code: code('EMPTYGX'), reporter_ids: [] }, a, 201);
+  assert.deepEqual(empty.process.reporter_ids, []);
+  for (const id of [foreignMember, inactiveMember, disabledUser, randomUUID()]) await post('/api/processes', { ...base, code: code('BADGX'), reporter_ids: [id] }, a, 422);
   const valid = (await post('/api/processes', base, p)).process;
   assert.equal(valid.standard_minutes, '0.100000');
   assert.deepEqual(valid.reporter_ids, [worker]);
@@ -202,12 +204,15 @@ test('BOM数量超出JavaScript安全小数区间仍不丢微量，拒绝非法�
   for (const quantity of ['-1', 'NaN', '1.0000001']) await post('/api/boms', { parent_product_id: otherParent.id, items: [{ component_product_id: leaf.id, quantity }] }, a, 400);
 });
 
-test('BOM每父仅一主档、修改用乐观版本，旧物料/单位名称保持快照', async () => {
+test('BOM同父可多主档、修改用乐观版本，旧物料/单位名称保持快照', async () => {
   const parent = await product('父产品旧名', 'manufactured'); const leaf = await product('材料旧名');
   const first = await bom(parent.id, [{ component_product_id: leaf.id, quantity: '1.03' }]);
   const frozen = await get('/api/bom-versions/' + first.current_version_id);
   assert.match(JSON.stringify(frozen), /材料旧名/);
-  await post('/api/boms', { parent_product_id: parent.id, items: [{ component_product_id: leaf.id, quantity: '2' }] }, a, 409);
+  // WHY: Round11 migration 096_r11_forms.sql dropped UNIQUE(tenant,parent) so one product may have multiple BOMs; only is_default stays unique. Not relaxing — asserting the intentional multi-BOM contract while keeping optimistic version + snapshot checks.
+  const sibling = await post('/api/boms', { parent_product_id: parent.id, name: '同父第二BOM', items: [{ component_product_id: leaf.id, quantity: '2' }] }, a, 201);
+  assert.equal(sibling.bom.parent_product_id, parent.id);
+  assert.notEqual(sibling.bom.id, first.id);
   const amended = await app.inject({ method: 'PATCH', url: '/api/products/' + leaf.id, headers: headers(a, true), payload: { version: 1, name: '材料新名', specification: '', unit_id: unitA, attribute: 'purchased', active: true } });
   assert.equal(amended.statusCode, 200, amended.body);
   const renamedParent = await app.inject({ method: 'PATCH', url: '/api/products/' + parent.id, headers: headers(a, true), payload: { version: 1, name: '父产品新名', specification: '', unit_id: unitA, attribute: 'manufactured', active: true } });
@@ -490,26 +495,36 @@ test('子产品单位变化不能隐式把旧子BOM产出单位当成新单位�
 });
 
 
-test('不能提交裸路线/BOM主档、伪造当前修订的空版本或无子项的新版本', async () => {
+test('裸路线/BOM主档与伪造修订仍拒绝；空版本主档按 Round11 允许', async () => {
+  // WHY: Round11 migration 101_r11_empty_master.sql allows empty route/BOM current versions so forms can create empty masters then fill steps/items. Bare headers and forged revision counters without a matching current_version_id still reject (23514).
   const parent = await product('空主档完整性BOM父件', 'manufactured');
   const ctx = { tenantId: tenantA, userId: admin };
-  const beforeRoutes = await get('/api/routes'); const beforeBoms = await get('/api/boms');
-  for (const mode of ['bare', 'forged', 'empty_current']) {
+  for (const mode of ['bare', 'forged'] as const) {
     await assert.rejects(db.tenant(ctx, async sql => {
       const header = (await sql.query<{ id: string }>('INSERT INTO process_routes(tenant_id,code,name,current_revision) VALUES($1,$2,$3,$4) RETURNING id', [tenantA, code('EMPTYRT'), '拒绝空路线主档', mode === 'forged' ? 1 : 0])).rows[0]!;
       if (mode !== 'bare') {
-        const version = (await sql.query<{ id: string }>('INSERT INTO route_versions(tenant_id,route_id,revision,name_snapshot) VALUES($1,$2,1,$3) RETURNING id', [tenantA, header.id, '拒绝空路线版本'])).rows[0]!;
-        if (mode === 'empty_current') await sql.query('UPDATE process_routes SET current_version_id=$1,current_revision=1 WHERE id=$2', [version.id, header.id]);
+        await sql.query('INSERT INTO route_versions(tenant_id,route_id,revision,name_snapshot) VALUES($1,$2,1,$3)', [tenantA, header.id, '拒绝空路线版本']);
       }
     }), { code: '23514' });
     await assert.rejects(db.tenant(ctx, async sql => {
-      const header = (await sql.query<{ id: string }>('INSERT INTO bom_definitions(tenant_id,parent_product_id,current_revision) VALUES($1,$2,$3) RETURNING id', [tenantA, parent.id, mode === 'forged' ? 1 : 0])).rows[0]!;
+      const header = (await sql.query<{ id: string }>('INSERT INTO bom_definitions(tenant_id,parent_product_id,name,current_revision) VALUES($1,$2,$3,$4) RETURNING id', [tenantA, parent.id, '拒绝空BOM主档', mode === 'forged' ? 1 : 0])).rows[0]!;
       if (mode !== 'bare') {
-        const version = (await sql.query<{ id: string }>('INSERT INTO bom_versions(tenant_id,bom_id,revision,parent_snapshot) VALUES($1,$2,1,$3::jsonb) RETURNING id', [tenantA, header.id, JSON.stringify({ id: parent.id, code: parent.code, name: parent.name, unit_id: parent.unit_id, unit_name: parent.unit_name, attribute: parent.attribute, active: true })])).rows[0]!;
-        if (mode === 'empty_current') await sql.query('UPDATE bom_definitions SET current_version_id=$1,current_revision=1 WHERE id=$2', [version.id, header.id]);
+        await sql.query('INSERT INTO bom_versions(tenant_id,bom_id,revision,parent_snapshot) VALUES($1,$2,1,$3::jsonb)', [tenantA, header.id, JSON.stringify({ id: parent.id, code: parent.code, name: parent.name, unit_id: parent.unit_id, unit_name: parent.unit_name, attribute: parent.attribute, active: true })]);
       }
     }), { code: '23514' });
   }
-  assert.deepEqual(await get('/api/routes'), beforeRoutes);
-  assert.deepEqual(await get('/api/boms'), beforeBoms);
+  const emptyRouteCode = code('OKRT');
+  const emptyBomName = '允许空BOM版本-' + emptyRouteCode;
+  await db.tenant(ctx, async sql => {
+    const route = (await sql.query<{ id: string }>('INSERT INTO process_routes(tenant_id,code,name,current_revision) VALUES($1,$2,$3,0) RETURNING id', [tenantA, emptyRouteCode, '允许空路线版本'])).rows[0]!;
+    const routeVersion = (await sql.query<{ id: string }>('INSERT INTO route_versions(tenant_id,route_id,revision,name_snapshot) VALUES($1,$2,1,$3) RETURNING id', [tenantA, route.id, '空路线版本'])).rows[0]!;
+    await sql.query('UPDATE process_routes SET current_version_id=$1,current_revision=1 WHERE id=$2', [routeVersion.id, route.id]);
+    const bomHeader = (await sql.query<{ id: string }>('INSERT INTO bom_definitions(tenant_id,parent_product_id,name,current_revision) VALUES($1,$2,$3,0) RETURNING id', [tenantA, parent.id, emptyBomName])).rows[0]!;
+    const bomVersion = (await sql.query<{ id: string }>('INSERT INTO bom_versions(tenant_id,bom_id,revision,parent_snapshot) VALUES($1,$2,1,$3::jsonb) RETURNING id', [tenantA, bomHeader.id, JSON.stringify({ id: parent.id, code: parent.code, name: parent.name, unit_id: parent.unit_id, unit_name: parent.unit_name, attribute: parent.attribute, active: true })])).rows[0]!;
+    await sql.query('UPDATE bom_definitions SET current_version_id=$1,current_revision=1 WHERE id=$2', [bomVersion.id, bomHeader.id]);
+  });
+  const routes = await get('/api/routes');
+  const boms = await get('/api/boms');
+  assert.ok(routes.items.some((item: { code: string; steps_count: number }) => item.code === emptyRouteCode && item.steps_count === 0));
+  assert.ok(boms.items.some((item: { name: string; items_count: number }) => item.name === emptyBomName && item.items_count === 0));
 });

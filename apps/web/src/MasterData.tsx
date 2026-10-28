@@ -4,6 +4,7 @@ import { canWriteProducts } from './api';
 import { EmptyState, Loading, Notice, StatusBadge } from './shared';
 import type { MasterPage, MasterProps, MasterUnit, Process, TeamMember } from './masterTypes';
 import { decimalPattern, idText } from './masterTypes';
+import { processFields } from './domain/payloads';
 import { EditorShell, useMutation, useRemote } from './masterTools';
 import { VersionedData } from './VersionedData';
 
@@ -51,7 +52,7 @@ function SimpleEditor({ kind, row, members, membersLoading, membersError, sessio
     event.preventDefault();
     if (!name.trim() || (!row && !code.trim())) { mutation.setError('请填写编号与名称。'); return; }
     if (kind === 'processes' && (!decimalPattern.test(minutes) || !reporters.length)) { mutation.setError('标准分钟需为最多6位小数的非负数，并至少选择一名报工人员。'); return; }
-    const fields = kind === 'units' ? { name: name.trim() } : { name: name.trim(), description: description.trim(), standard_minutes: minutes, reporter_ids: reporters };
+    const fields = kind === 'units' ? { name: name.trim() } : processFields(name, description, minutes, reporters);
     void mutation.save(row ? `/api/${kind}/${encodeURIComponent(idText(row.id))}` : `/api/${kind}`, row ? { ...fields, version: row.version, active } : { ...fields, code: code.trim() }, row ? 'PATCH' : 'POST');
   }
   return <EditorShell title={`${row ? writable ? '编辑' : '查看' : '新增'}${kind === 'units' ? '单位' : '工序'}`} tenant={session.tenant.name} onClose={onClose} saving={mutation.saving} error={mutation.error} conflict={mutation.conflict} onSubmit={writable ? submit : undefined} submitDisabled={kind === 'processes' && (membersLoading || !!membersError)}>

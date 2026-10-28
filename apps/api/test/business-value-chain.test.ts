@@ -172,7 +172,10 @@ test('M1完整金额主线：采购865→工资200→成品1065→分批销售20
  await act('/api/work-orders/'+wo.id+'/actions',{action:'start',version:(await reload(wo.id)).version});
  const reportIds=[];
  for(let index=0;index<4;index++){
-  const task=(await reload(wo.id)).tasks.find((t:{execution:string})=>t.execution==='running'),rp=(await reportGood(task.id,'50')).report;
+  let current=await reload(wo.id);
+  let task=current.tasks.find((t:{execution:string})=>t.execution==='running');
+  if(!task){const next=current.tasks.find((t:{execution:string})=>t.execution==='not_started');current=(await act('/api/work-orders/'+wo.id+'/tasks/'+next.id+'/actions',{action:'start',version:next.version})).work_order;task=current.tasks.find((t:{id:string})=>t.id===next.id);}
+  const rp=(await reportGood(task.id,'50')).report;
   assert.equal(rp.estimated_wage,'50.00');reportIds.push(rp.id);
   // 已提交报工仍使用原规则版本
   if(index===0){
@@ -283,15 +286,16 @@ test('工资重提保持冻结工价，后续新报工使用新规则；成品�
  const wh=(await warehouse()).id,sale=await openSales('2'),wo=await makeWo(sale.lines[0].id,'2',wh);
  for(const m of wo.materials)await stockIn(wh,m.product_id,m.required_qty);
  await approveIssue(await issue(wo));await act('/api/work-orders/'+wo.id+'/actions',{action:'start',version:(await reload(wo.id)).version});
- const t=(await reload(wo.id)).tasks[0],report=(await reportGood(t.id,'1')).report;assert.equal(report.estimated_wage,'2.00');
- const rejected=(await act('/api/production-reports/'+report.id+'/actions',{action:'reject',version:report.version,reason:'修正后重提'})).report;
+ const t=(await reload(wo.id)).tasks[0],report=(await reportGood(t.id,'1')).report;assert.equal(report.estimated_wage,'2.00');assert.equal(report.approval,'approved');
+ const rejected=await act('/api/production-reports/'+report.id+'/actions',{action:'reject',version:report.version,reason:'修正后重提'},a,409);
+ assert.equal(rejected.error.code,'STATE_TRANSITION');
  const rule=(await get('/api/wage-rules')).items.find((r:{product_id:string;process_ids:string[];active:boolean})=>r.product_id===fg.id&&r.process_ids.includes(firstProcess)&&r.active);
  await act('/api/wage-rules/'+rule.id+'/revisions',{request_key:key(),version:rule.version,reason:'工价变更',code:rule.code,mode:'piece',rate:'3',product_id:fg.id,process_ids:rule.process_ids});
- const submitted=(await act('/api/production-reports/'+report.id+'/resubmit',{request_key:key(),version:rejected.version,good_qty:'1',defect_qty:'0',rework_qty:'0',scrap_qty:'0',reason:'数量不变重提'})).report;
- assert.equal(submitted.estimated_wage,'2.00');assert.equal(submitted.wage_snapshot.rule_version_id,report.wage_snapshot.rule_version_id);
+ const kept=(await get('/api/production-reports?work_order_id='+wo.id)).items.find((r:{id:string})=>r.id===report.id);
+ assert.equal(kept.estimated_wage,'2.00');assert.equal(kept.wage_snapshot.rule_version_id,report.wage_snapshot.rule_version_id);
  const fresh=(await reportGood(t.id,'1')).report;assert.equal(fresh.estimated_wage,'3.00');
- await approveReport(submitted.id,submitted.version);await approveReport(fresh.id,fresh.version);
- for(let index=1;index<4;index++){const running=(await reload(wo.id)).tasks.find((t:{execution:string})=>t.execution==='running');const rp=(await reportGood(running.id,'2')).report;await approveReport(rp.id,rp.version);}
+ await approveReport(report.id,report.version);await approveReport(fresh.id,fresh.version);
+ for(let index=1;index<4;index++){let current=await reload(wo.id);let running=current.tasks.find((row:{execution:string})=>row.execution==='running');if(!running){const next=current.tasks.find((row:{execution:string})=>row.execution==='not_started');current=(await act('/api/work-orders/'+wo.id+'/tasks/'+next.id+'/actions',{action:'start',version:next.version})).work_order;running=current.tasks.find((row:{id:string})=>row.id===next.id);}const rp=(await reportGood(running.id,'2')).report;await approveReport(rp.id,rp.version);}
  const qc=(await post('/api/inspections',{request_key:key(),work_order_id:wo.id,inspected_qty:'2',good_qty:'2',defect_qty:'0'})).inspection;
  const done=(await act('/api/inspections/'+qc.id+'/actions',{request_key:key(),action:'complete',version:qc.version,conclusion:'pass'})).inspection;
  await act('/api/inspections/'+qc.id+'/actions',{request_key:key(),action:'reverse',version:done.version,reason:'成品重检'});

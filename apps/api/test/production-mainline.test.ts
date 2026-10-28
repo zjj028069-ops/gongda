@@ -142,17 +142,20 @@ test('未开工加工单不能通过暂停再恢复绕过备料与显式开工',
   assert.ok(unchanged.materials.every((row: { issued_qty: string }) => row.issued_qty === '0.000000'));
 });
 
-test('任务手工暂停期间审核足量报工，恢复后完成该任务并推进下一序', async () => {
+test('任务手工暂停期间不能报工，恢复后足量报工立即完成且不自动开始下一道', async () => {
   const { wo } = await readyWork();
   const task = wo.tasks[0];
-  const submitted = await reportGood(task.id, '1');
-  await act(`/api/work-orders/${wo.id}/tasks/${task.id}/actions`, { action: 'pause', version: task.version, reason: '等待审核' });
-  await approveReport(submitted.report.id, submitted.report.version);
+  await act(`/api/work-orders/${wo.id}/tasks/${task.id}/actions`, { action: 'pause', version: task.version, reason: '等待确认' });
+  const blocked = await post('/api/production-reports', { request_key: key(), task_id: task.id, operator_id: worker, good_qty: '1', defect_qty: '0', rework_qty: '0', scrap_qty: '0' }, a, 409);
+  assert.equal(blocked.error.code, 'STATE_TRANSITION');
   const paused = await reload(wo.id);
   assert.equal(paused.tasks[0].execution, 'paused');
   const resumed = (await act(`/api/work-orders/${wo.id}/tasks/${task.id}/actions`, { action: 'resume', version: paused.tasks[0].version })).work_order;
-  assert.equal(resumed.tasks[0].execution, 'completed');
-  assert.equal(resumed.tasks[1].execution, 'running');
+  assert.equal(resumed.tasks[0].execution, 'running');
+  await reportGood(task.id, '1');
+  const done = await reload(wo.id);
+  assert.equal(done.tasks[0].execution, 'completed');
+  assert.equal(done.tasks[1].execution, 'not_started');
 });
 
 test('整单暂停期间审核足量报工，恢复后不会卡在已足量的运行任务', async () => {
@@ -163,7 +166,7 @@ test('整单暂停期间审核足量报工，恢复后不会卡在已足量的�
   const paused = await reload(wo.id);
   const resumed = (await act(`/api/work-orders/${wo.id}/actions`, { action: 'resume', version: paused.version })).work_order;
   assert.equal(resumed.tasks[0].execution, 'completed');
-  assert.equal(resumed.tasks[1].execution, 'running');
+  assert.equal(resumed.tasks[1].execution, 'not_started');
 });
 
 test('发货草稿建立后订单强制关闭，审核重新检查来源且不扣库存', async () => {
@@ -246,14 +249,14 @@ test('成品检验已有来源数量时不能冲销末道报工留下无来源�
   assert.equal((await reload(wo.id)).output_qty, '1.000000');
 });
 
-test('补产标记不能允许净合格超过原任务计划或跳过追加投入来源', async () => {
+test('超计划报工直接生效，引用不存在的追加投入仍然拒绝', async () => {
   const { wo } = await readyWork();
-  const tooGood = await post('/api/production-reports', { request_key: key(), task_id: wo.tasks[0].id, operator_id: worker, good_qty: '2', defect_qty: '0', rework_qty: '0', scrap_qty: '0', supplement: true }, a, 422);
-  assert.equal(tooGood.error.code, 'OVER_PLAN');
-  const defect = (await post('/api/production-reports', { request_key: key(), task_id: wo.tasks[0].id, operator_id: worker, good_qty: '0', defect_qty: '1', rework_qty: '0', scrap_qty: '1', defect_note: '报废' })).report;
-  await approveReport(defect.id, defect.version);
-  const unbacked = await post('/api/production-reports', { request_key: key(), task_id: wo.tasks[0].id, operator_id: worker, good_qty: '1', defect_qty: '0', rework_qty: '0', scrap_qty: '0', supplement: true }, a, 422);
-  assert.equal(unbacked.error.code, 'SUPPLEMENT_SOURCE_REQUIRED');
+  const missing = await post('/api/production-reports', { request_key: key(), task_id: wo.tasks[0].id, operator_id: worker, good_qty: '1', defect_qty: '0', rework_qty: '0', scrap_qty: '0', supplement_id: '00000000-0000-4000-8000-000000000099' }, a, 422);
+  assert.equal(missing.error.code, 'SUPPLEMENT_SOURCE_REQUIRED');
+  const over = await post('/api/production-reports', { request_key: key(), task_id: wo.tasks[0].id, operator_id: worker, good_qty: '2', defect_qty: '0', rework_qty: '0', scrap_qty: '0', supplement: true });
+  assert.equal(over.report.approval, 'approved');
+  assert.equal(over.report.good_qty, '2.000000');
+  assert.equal((await reload(wo.id)).tasks[0].approved_good, '2.000000');
 });
 
 test('单位关系重复序号不能静默取最后一条，也不能占用销售已排数量', async () => {
@@ -309,11 +312,19 @@ for (const fixture of [{ label: 'BOM', table: 'bom_definitions', id: () => bomId
     } finally { await db.admin((sql) => sql.query(`UPDATE ${fixture.table} SET active=true WHERE id=$1`, [resourceId])); }
   });
 }
-async function finishReports(wo: { id: string }) {
+async function finishReports(wo: { id: string }, quantities?: string[]) {
   let current = await reload(wo.id);
-  while (current.tasks.some((task: { execution: string }) => task.execution === 'running')) {
-    const task = current.tasks.find((row: { execution: string }) => row.execution === 'running');
-    const submitted = await reportGood(task.id, task.plan_qty);
+  let index = 0;
+  while (current.tasks.some((task: { execution: string }) => !['completed', 'cancelled'].includes(task.execution))) {
+    let task = current.tasks.find((row: { execution: string }) => row.execution === 'running');
+    if (!task) {
+      const next = current.tasks.find((row: { execution: string }) => row.execution === 'not_started');
+      if (!next) break;
+      current = (await act(`/api/work-orders/${current.id}/tasks/${next.id}/actions`, { action: 'start', version: next.version })).work_order;
+      task = current.tasks.find((row: { id: string }) => row.id === next.id);
+    }
+    const submitted = await reportGood(task.id, quantities?.[index] ?? task.plan_qty);
+    index += 1;
     await approveReport(submitted.report.id, submitted.report.version);
     current = await reload(wo.id);
   }
@@ -367,27 +378,23 @@ test('50件主线从销售冻结到领料报工入库分批发货，快照不随
   const byProduct = Object.fromEntries(wo.materials.map((row: { product_id: string; required_qty: string; feeding_task_id: string | null }) => [row.product_id, row]));
   assert.equal(byProduct[steel.id].required_qty, '51.500000'); assert.equal(byProduct[caster.id].required_qty, '100.000000'); assert.equal(byProduct[board.id].required_qty, '50.000000');
   assert.equal(byProduct[steel.id].feeding_task_id, wo.tasks[0].id); assert.equal(wo.tasks.length, 4); assert.equal(wo.tasks[3].is_output, true); assert.equal(wo.tasks[0].plan_qty, '50.000000');
-  const early = await act('/api/work-orders/' + wo.id + '/actions', { action: 'start', version: wo.version }, a, 422);
-  assert.equal(early.error.code, 'MATERIALS_NOT_READY');
+  const started = await act('/api/work-orders/' + wo.id + '/actions', { action: 'start', version: wo.version });
+  assert.equal(started.work_order.execution, 'running'); assert.equal(started.work_order.tasks[0].execution, 'running'); assert.equal(started.work_order.tasks[1].execution, 'not_started');
   const postedIssue = await approveIssue(await issue(wo));
   assert.equal(postedIssue.posted, true); assert.equal(await onHand(wh, steel.id), '0.000000'); assert.equal(await onHand(wh, caster.id), '0.000000'); assert.equal(await onHand(wh, board.id), '0.000000');
-  let current = await reload(wo.id);
-  const started = await act('/api/work-orders/' + wo.id + '/actions', { action: 'start', version: current.version });
-  assert.equal(started.work_order.execution, 'running'); assert.equal(started.work_order.tasks[0].execution, 'running'); assert.equal(started.work_order.tasks[1].execution, 'not_started');
-  current = started.work_order;
+  let current = started.work_order;
   for (let index = 0; index < 4; index++) {
-    const task = current.tasks.find((row: { execution: string }) => row.execution === 'running');
-    assert.ok(task, '串行路线同一时刻只有一道执行中任务');
+    if (current.tasks[index].execution === 'not_started') current = (await act(`/api/work-orders/${wo.id}/tasks/${current.tasks[index].id}/actions`, { action: 'start', version: current.tasks[index].version })).work_order;
+    const task = current.tasks[index];
+    assert.equal(task.execution, 'running');
     const submittedReport = await reportGood(task.id, '50');
-    assert.equal(submittedReport.report.posted, false); assert.equal(submittedReport.report.estimated_wage, null); assert.equal(submittedReport.report.wage_status, 'unpriced');
+    assert.equal(submittedReport.report.posted, true); assert.equal(submittedReport.report.estimated_wage, null); assert.equal(submittedReport.report.wage_status, 'unpriced');
     const approved = await approveReport(submittedReport.report.id, submittedReport.report.version);
     assert.equal(approved.posted, true); assert.equal(approved.operator_id, worker); assert.notEqual(approved.reporter_id, worker);
     current = await reload(wo.id);
     assert.equal(current.tasks[index].execution, 'completed'); assert.equal(current.tasks[index].approved_good, '50.000000');
   }
-  assert.equal(current.execution, 'running'); assert.equal(current.output_qty, '50.000000'); assert.equal(current.received_qty, '0.000000');
-  const completed = await act('/api/work-orders/' + wo.id + '/actions', { action: 'complete', version: current.version });
-  assert.equal(completed.work_order.execution, 'completed');
+  assert.equal(current.execution, 'completed'); assert.equal(current.output_qty, '50.000000'); assert.equal(current.received_qty, '0.000000');
   const receipt = await post('/api/fg-receipts', { request_key: key(), work_order_id: wo.id, quantity: '50' });
   const postedReceipt = await act('/api/fg-receipts/' + receipt.fg_receipt.id + '/actions', { action: 'approve', version: receipt.fg_receipt.version, request_key: key() });
   assert.equal(postedReceipt.fg_receipt.posted, true); assert.equal(await onHand(wh, fg.id), '50.000000');
@@ -544,21 +551,19 @@ test('报工数量守恒：空报工、超不良处置、超计划和未审核�
   const taskId = started.work_order.tasks[0].id;
   assert.equal((await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '0', defect_qty: '0', rework_qty: '0', scrap_qty: '0' }, a, 422)).error.code, 'EMPTY_REPORT');
   assert.equal((await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '0', defect_qty: '2', rework_qty: '2', scrap_qty: '1' }, a, 422)).error.code, 'DISPOSITION_EXCEEDS_DEFECT');
-  assert.equal((await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '0', defect_qty: '1', rework_qty: '0', scrap_qty: '0' }, a, 422)).error.code, 'DEFECT_NOTE_REQUIRED');
-  const overPlan = await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '11', defect_qty: '0', rework_qty: '0', scrap_qty: '0' }, a, 422);
-  assert.equal(overPlan.error.code, 'OVER_PLAN');
   const defect = await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '0', defect_qty: '4', rework_qty: '1', scrap_qty: '1', defect_note: '焊缝不良' });
   let current = await reload(wo.id);
-  assert.equal(current.tasks[0].approved_good, '0.000000'); assert.equal(defect.report.disposition_pending, '2.000000'); assert.equal(defect.report.posted, false);
-  const approved = await approveReport(defect.report.id, defect.report.version);
-  current = await reload(wo.id);
-  assert.equal(approved.posted, true); assert.equal(current.tasks[0].approved_good, '0.000000'); assert.equal(current.tasks[0].approved_defect, '4.000000'); assert.equal(current.tasks[0].execution, 'running');
+  assert.equal(defect.report.posted, true); assert.equal(defect.report.disposition_pending, '2.000000');
+  assert.equal(current.tasks[0].approved_good, '0.000000'); assert.equal(current.tasks[0].approved_defect, '4.000000'); assert.equal(current.tasks[0].execution, 'running');
+  const noted = await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '0', defect_qty: '1', rework_qty: '0', scrap_qty: '0' });
+  assert.equal(noted.report.approval, 'approved'); assert.equal(noted.report.defect_note, '');
   const pending = await reportGood(taskId, '3');
   current = await reload(wo.id);
-  assert.equal(current.tasks[0].approved_good, '0.000000');
-  await approveReport(pending.report.id, pending.report.version);
+  assert.equal(pending.report.posted, true); assert.equal(current.tasks[0].approved_good, '3.000000');
+  const overPlan = await post('/api/production-reports', { request_key: key(), task_id: taskId, operator_id: worker, good_qty: '11', defect_qty: '0', rework_qty: '0', scrap_qty: '0' });
+  assert.equal(overPlan.report.approval, 'approved'); assert.equal(overPlan.report.good_qty, '11.000000');
   current = await reload(wo.id);
-  assert.equal(current.tasks[0].approved_good, '3.000000');
+  assert.equal(current.tasks[0].execution, 'completed');
 });
 
 test('末道单位关系把任务数量换算回成品数量，只有末道能入库', async () => {
@@ -569,12 +574,7 @@ test('末道单位关系把任务数量换算回成品数量，只有末道能�
   for (const row of wo.materials) await stockIn(wh, row.product_id, row.required_qty);
   await approveIssue(await issue(wo));
   let current = (await act('/api/work-orders/' + wo.id + '/actions', { action: 'start', version: (await reload(wo.id)).version })).work_order;
-  for (const plan of ['2', '2', '2', '4']) {
-    const task = current.tasks.find((row: { execution: string }) => row.execution === 'running');
-    const submitted = await reportGood(task.id, plan);
-    await approveReport(submitted.report.id, submitted.report.version);
-    current = await reload(wo.id);
-  }
+  current = await finishReports(current, ['2', '2', '2', '4']);
   assert.equal(current.output_qty, '2.000000'); assert.equal(current.tasks[3].approved_good, '4.000000');
   const receipt = await post('/api/fg-receipts', { request_key: key(), work_order_id: wo.id, quantity: '2' });
   await act('/api/fg-receipts/' + receipt.fg_receipt.id + '/actions', { action: 'approve', version: receipt.fg_receipt.version, request_key: key() });
@@ -589,12 +589,7 @@ test('要求成品检验时，未放行不能入库', async () => {
   for (const row of wo.materials) await stockIn(wh, row.product_id, row.required_qty);
   await approveIssue(await issue(wo));
   let current = (await act('/api/work-orders/' + wo.id + '/actions', { action: 'start', version: (await reload(wo.id)).version })).work_order;
-  for (let index = 0; index < 4; index++) {
-    const task = current.tasks.find((row: { execution: string }) => row.execution === 'running');
-    const submitted = await reportGood(task.id, '1');
-    await approveReport(submitted.report.id, submitted.report.version);
-    current = await reload(wo.id);
-  }
+  current = await finishReports(current);
   const receipt = await post('/api/fg-receipts', { request_key: key(), work_order_id: wo.id, quantity: '1' });
   const blocked = await act('/api/fg-receipts/' + receipt.fg_receipt.id + '/actions', { action: 'approve', version: receipt.fg_receipt.version }, a, 422);
   assert.equal(blocked.error.code, 'QUALITY_REQUIRED'); assert.equal(await onHand(wh, fg.id), '0.000000');
@@ -705,4 +700,34 @@ test('已有 BOM 绑定旧路线版本时，样例冻结该版本并复用 SO000
   assert.equal(replay.replayed, true);
   assert.equal(replay.work_order.id, created.work_order.id);
   assert.equal((await get('/api/work-orders')).items.filter((item: { sales_line_id: string; execution: string }) => item.sales_line_id === sales.lines[0].id && item.execution !== 'cancelled').length, 1);
+});
+
+test('直接创建加工单号留空时按 JG+日期+流水生成，不传编号仍用 WO；校验失败提示中文字段', async () => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)!.value;
+  const stamp = value('year').slice(2) + value('month') + value('day');
+  const wh = (await warehouse()).id;
+  const sales = await openSales('10');
+  const lineId = sales.lines[0].id;
+  await makeWo(lineId, '1', wh, { code: 'JG' + stamp + '-8' });
+  const blank = await makeWo(lineId, '1', wh, { code: '' });
+  const next = await makeWo(lineId, '1', wh, { code: '' });
+  assert.equal(blank.code, 'JG' + stamp + '-9');
+  assert.equal(next.code, 'JG' + stamp + '-10');
+  const parallel = await Promise.all([1, 2, 3, 4].map(() => makeWo(lineId, '1', wh, { code: '' })));
+  assert.deepEqual(parallel.map((row) => row.code).slice().sort(), ['11', '12', '13', '14'].map((suffix) => 'JG' + stamp + '-' + suffix));
+  const omitted = await makeWo(lineId, '1', wh);
+  assert.match(omitted.code, /^WO\d{6}$/);
+  const custom = await makeWo(lineId, '1', wh, { code: 'HAND-0008' });
+  assert.equal(custom.code, 'HAND-0008');
+  const duplicate = await post('/api/work-orders', { request_key: key(), code: 'HAND-0008', sales_line_id: lineId, quantity: '1', route_version_id: routeVersionId, bom_version_id: bomVersionId, warehouse_id: wh }, a, 409);
+  assert.equal(duplicate.error.code, 'DUPLICATE');
+  // WHY: Round11 intentional — omitting warehouse_id auto-picks earliest active warehouse (production.ts). Not relaxing JG numbering; Chinese field validation asserted via missing quantity instead.
+  const autoWh = await post('/api/work-orders', { request_key: key(), code: '', sales_line_id: lineId, quantity: '1', route_version_id: routeVersionId, bom_version_id: bomVersionId }, a, 201);
+  assert.ok(autoWh.work_order.warehouse_id);
+  const missingQty = await post('/api/work-orders', { request_key: key(), code: '', sales_line_id: lineId, route_version_id: routeVersionId, bom_version_id: bomVersionId, warehouse_id: wh }, a, 400);
+  assert.equal(missingQty.error.code, 'VALIDATION_ERROR');
+  assert.equal(missingQty.error.message, '请填写计划数');
+  const noUnit = await post('/api/products', { code: code('FREE'), name: '可无单位', attribute: 'manufactured' }, a, 201);
+  assert.equal(noUnit.product.unit_id, null);
 });

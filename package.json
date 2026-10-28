@@ -1,6 +1,6 @@
 {
   "name": "gongdan-platform",
-  "version": "0.5.0-dev.1",
+  "version": "1.0.27",
   "private": true,
   "workspaces": [
     "apps/api",
@@ -11,7 +11,6 @@
   },
   "scripts": {
     "dev:setup": "npm run dev:setup -w @gongdan/api",
-    "control:setup": "npm run control:setup -w @gongdan/api",
     "dev:api": "npm run dev -w @gongdan/api",
     "dev:web": "npm run dev -w @gongdan/web",
     "dev": "node scripts/dev.mjs",
@@ -23,5 +22,8 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
   }
 }

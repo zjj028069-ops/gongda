@@ -1,10 +1,11 @@
 import { Problem } from './services.js';
 export const SCALE=1_000_000n;
 export const MAX=99_999_999_999_999_999_999n;
-export function decimal(value:string,{positive=false,max=MAX}:{positive?:boolean;max?:bigint}={}){
- if(typeof value!=='string'||!/^(?:0|[1-9]\d{0,13})(?:\.\d{1,6})?$/.test(value)) throw new Problem(400,'DECIMAL_FORMAT','数量须为最多14位整数、6位小数的非负十进制文本');
+export function decimal(value:string,{positive=false,max=MAX,label='数量',field}:{positive?:boolean;max?:bigint;label?:string;field?:string}={}){
+ if(typeof value!=='string'||!String(value).trim()) throw new Problem(400,'DECIMAL_FORMAT',`请填写${label}`,field);
+ if(!/^(?:0|[1-9]\d{0,13})(?:\.\d{1,6})?$/.test(value)) throw new Problem(400,'DECIMAL_FORMAT',`${label}最多 6 位小数`,field);
  const [whole,fraction='']=value.split('.');const n=BigInt(whole!)*SCALE+BigInt(fraction.padEnd(6,'0'));
- if(n>max||(positive&&n===0n)) throw new Problem(422,'DECIMAL_RANGE','数量超出允许范围');
+ if(n>max||(positive&&n===0n)) throw new Problem(422,'DECIMAL_RANGE',`${label}超出允许范围`,field);
  return n;
 }
 export function formatDecimal(n:bigint){const sign=n<0n?'-':'',v=n<0n?-n:n;return `${sign}${v/SCALE}.${(v%SCALE).toString().padStart(6,'0')}`;}

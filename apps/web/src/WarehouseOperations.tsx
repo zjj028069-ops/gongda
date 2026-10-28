@@ -3,6 +3,7 @@ import {apiRequest,ApiError,errorMessage,hasPermission,type Session,type Product
 import {useRemote} from './masterTools';
 import {CommandKeys} from './commandKeys';
 import {Loading,Notice,EmptyState} from './shared';
+import { requestKey } from './requestKey';
 type Props={session:Session;revision:number;onExpired:()=>void;onChanged:()=>void};
 type WH={id:string;code:string;name:string;active:boolean};
 type Event={id:string;event_key:string;direction:string;quantity:string;amount?:string|null;reversal_of:string|null};
@@ -21,7 +22,7 @@ export function WarehouseOperations(p:Props){
  useEffect(()=>{if(products.data)setCache(old=>({...old,...Object.fromEntries(products.data!.items.map(x=>[x.id,x]))}));},[products.data]);
  const warehouseName=(id:string)=>{const w=warehouses.data?.items.find(x=>x.id===id);return w?w.code+' · '+w.name:id;};
  const whOptions=warehouses.data?.items.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.code} · {x.name}</option>);
- async function command(path:string,body:Record<string,unknown>,create=false){if(mutex.current)return;mutex.current=true;setBusy(true);setInfo('');setError('');const prepared=keys.current.prepare(path,{...body,request_key:crypto.randomUUID()});
+ async function command(path:string,body:Record<string,unknown>,create=false){if(mutex.current)return;mutex.current=true;setBusy(true);setInfo('');setError('');const prepared=keys.current.prepare(path,{...body,request_key:requestKey()});
   try{await apiRequest(path,{method:'POST',body:prepared,csrfToken:p.session.csrf_token});keys.current.complete(path,prepared);p.onChanged();setInfo(path==='/api/warehouses'?'仓库已保存，可以选择发仓和收仓。':create?'单据已保存，尚未产生库存变动。':'库存与来源记录已刷新。');if(path==='/api/warehouses'){setWhCode('');setWhName('');}if(create){setWhy('');setQuantity('');setActual('');setPrice('');}setActionReason('');}catch(e){if(e instanceof ApiError&&e.status===401)p.onExpired();else setError(errorMessage(e));}finally{mutex.current=false;setBusy(false);}
  }
  function create(e:FormEvent){e.preventDefault();void command(tab==='transfer'?'/api/warehouse-transfers':'/api/stock-counts',tab==='transfer'?{from_warehouse_id:from,to_warehouse_id:to,product_id:product,quantity,reason:why.trim()}:{warehouse_id:from,product_id:product,actual_qty:actual,reason:why.trim(),...(price.trim()?{unit_price:price.trim()}:{})},true);}

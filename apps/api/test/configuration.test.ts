@@ -16,7 +16,7 @@ async function login(slug:string,username='config.admin'):Promise<Session>{const
 async function request(method:'GET'|'POST'|'PUT'|'PATCH',url:string,payload?:unknown,session=a,status=method==='POST'?201:200){const response=await app.inject({method,url,headers:headers(session,method!=='GET'),...(payload!==undefined?{payload}:{})});assert.equal(response.statusCode,status,response.body);return response.json();}
 const get=(url:string,session=a,status=200)=>request('GET',url,undefined,session,status);
 const post=(url:string,payload:unknown,session=a,status=201)=>request('POST',url,payload,session,status);
-const makeProduct=(extra:Record<string,unknown>={},session=a,status=201)=>post('/api/products',{code:'PC-'+randomUUID().slice(0,8),name:'配置产品',unit_id:unit,attribute:'purchased',...extra},session,status);
+const makeProduct=(extra:Record<string,unknown>={},session=a,status=201)=>post('/api/products',{code:'PC-'+randomUUID().slice(0,8),name:'配置产品-'+randomUUID().slice(0,8),unit_id:unit,attribute:'purchased',...extra},session,status);
 async function patchProduct(product:any,extra:Record<string,unknown>={},session=a,status=200){return request('PATCH','/api/products/'+product.id,{version:product.version,name:product.name,specification:product.specification,unit_id:product.unit_id,attribute:product.attribute,active:product.active,...extra},session,status);}
 async function createRule(entity='product',extra:Record<string,unknown>={}){return (await post('/api/configuration/number-rules',{entity,prefix:'CF-',date_pattern:'none',reset_period:'never',padding:4,start:1,...extra})).rule;}
 async function count(sqlText:string){return db.tenant({tenantId:tenantA,userId:admin},async sql=>(await sql.query<{count:string}>(sqlText)).rows[0]!.count);}

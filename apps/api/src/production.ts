@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto';
 import { postStock,releaseReservations } from './inventory.js';
 import {lineCents,round as roundMoney,rate as priceRate,money as cashMoney} from './business-common.js';
-import { freezeWage,wageView,postWage,workCosts,type WageSnapshot } from './accounting.js';
+import { freezeWage,priceWage,wageView,postWage,workCosts,type WageSnapshot } from './accounting.js';
 import type { FastifyInstance } from 'fastify';
 import type { Sql } from './database.js';
 import { decimal, formatDecimal, SCALE, bounded } from './decimal.js';
 import { gateTenantWrite } from './assets.js';
 import { Problem, requireAllScope, writeAudit, type Actor, type Services } from './services.js';
+import { applyPerformance, matchPerformance } from './performance-pay.js';
+import { runAutoStock } from './auto-stock.js';
 
 const uuid = { type: 'string', format: 'uuid' };
 const text = (max: number) => ({ type: 'string', minLength: 1, maxLength: max, pattern: '^\\S(?:.*\\S)?$' });
@@ -22,8 +24,11 @@ const dateField = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' };
 type Leaf = { product_id: string; unit_id: string; code: string; name: string; unit_name: string; amount: bigint; paths: string[]; feeding: string | null; ambiguous: boolean };
 type BomItemRow = { component_product_id: string; unit_id: string; component_code: string; component_name: string; unit_name: string; quantity: string; loss_rate: string; feeding_process_id: string | null; component_bom_version_id: string | null };
 type StepRow = { id: string; sequence: number; process_id: string; process_code: string; process_name: string; standard_minutes: string; reporter_ids: string[]; auto_inbound: boolean };
-type TaskRow = { id: string; work_order_id: string; sequence: number; route_step_id: string; process_id: string; process_snapshot: Record<string, unknown>; unit_ratio: string; plan_qty: string; is_output: boolean; execution: string; pause_source: string; previous_execution: string | null; approved_good: string; approved_defect: string; approved_rework: string; approved_scrap: string; version: number };
-type WoRow = { id: string; code: string; product_id: string; unit_id: string; plan_qty: string; sales_order_id: string; sales_line_id: string; route_version_id: string; bom_version_id: string; warehouse_id: string; product_snapshot: Record<string, unknown>; route_name_snapshot: string; bom_revision: number; execution: string; order_paused: boolean; requires_fg_inspection: boolean; close_reason: string; version: number; started_at: string | null; completed_at: string | null; created_at: string };
+type TaskRow = { id: string; work_order_id: string; sequence: number; route_step_id: string | null; process_id: string; process_snapshot: Record<string, unknown>; unit_ratio: string; plan_qty: string; is_output: boolean; execution: string; pause_source: string; previous_execution: string | null; wage_rule_version_id: string | null; approved_good: string; approved_defect: string; approved_rework: string; approved_scrap: string; pricing_mode: string; wage_rate: string | null; inspection_scheme: string; started_at: string | null; completed_at: string | null; completion_source: string; version: number };
+type WoRow = { id: string; code: string; product_id: string; unit_id: string; plan_qty: string; sales_order_id: string | null; sales_line_id: string | null; contract_id: string | null; contract_line_id: string | null; project_id: string | null; route_version_id: string | null; bom_version_id: string | null; warehouse_id: string; product_snapshot: Record<string, unknown>; route_name_snapshot: string; bom_revision: number | null; execution: string; order_paused: boolean; requires_fg_inspection: boolean; close_reason: string; priority: string; due_date: string | null; planned_start: string | null; planned_end: string | null; note: string; production_plan_line_id: string | null; version: number; started_at: string | null; completed_at: string | null; created_at: string };
+const taskColumns = 'id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio::text,plan_qty::text,is_output,execution,pause_source,previous_execution,wage_rule_version_id,approved_good::text,approved_defect::text,approved_rework::text,approved_scrap::text,pricing_mode,wage_rate::text,inspection_scheme,started_at,completed_at,completion_source,version';
+type WoCreate = { request_key: string; quantity: string; warehouse_id?: string; sales_line_id?: string; contract_line_id?: string; route_version_id?: string; bom_version_id?: string; product_id?: string; production_plan_line_id?: string; code?: string; requires_fg_inspection?: boolean; require_cost?: boolean; priority?: 'none' | 'urgent' | 'normal' | 'delayed'; due_date?: string | null; planned_start?: string | null; planned_end?: string | null; note?: string; unit_ratios?: { sequence: number; unit_ratio: string }[]; tasks?: { process_id: string; unit_ratio?: string; pricing_mode?: 'piece' | 'time'; wage_rate?: string | null; route_step_id?: string | null }[] };
+const woColumns = 'id,code,product_id,unit_id,plan_qty::text,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,execution,order_paused,requires_fg_inspection,close_reason,priority,due_date::text,planned_start::text,planned_end::text,note,production_plan_line_id,project_id,parent_id,version,started_at,completed_at,created_at';
 
 const permit = (actor: Actor, permission: string) => { if (!actor.permissions.includes(permission)) throw new Problem(403, 'FORBIDDEN', '当前角色没有操作权限'); };
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -47,6 +52,47 @@ async function nextCode(sql: Sql, tenantId: string, docType: string, prefix: str
   const sequence = BigInt(row.n);
   await sql.query('UPDATE document_counters SET next_value=$1 WHERE doc_type=$2', [(sequence + 1n).toString(), docType]);
   return prefix + sequence.toString().padStart(6, '0');
+}
+const optionalCode = { type: 'string', maxLength: 64, pattern: '^(?:|\\S(?:.*\\S)?)$' };
+const rateField = { type: 'string', pattern: '^(?:0|[1-9]\\d{0,13})(?:\\.\\d{1,7})?$' };
+const nullableUuid = { anyOf: [uuid, { type: 'null' }] };
+const nullableDate = { anyOf: [dateField, { type: 'null' }] };
+function shanghaiDateTime(value: string | null | undefined) {
+  if (!value) return null;
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(value)) return value;
+  return value.replace(' ', 'T') + '+08:00';
+}
+function shanghaiStamp(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+  const value = (type: string) => parts.find((part) => part.type === type)!.value;
+  return value('year').slice(2) + value('month') + value('day');
+}
+/** 直接创建加工单留空编号：JG + 上海日期 yyMMdd + '-' + 当日流水，如 JG261005-1。 */
+async function nextDirectWorkOrderCode(sql: Sql, tenantId: string) {
+  const stamp = shanghaiStamp();
+  const prefix = 'JG' + stamp + '-';
+  await sql.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [tenantId, 'work-order-direct:' + stamp]);
+  const rows = (await sql.query<{ code: string }>('SELECT code FROM work_orders WHERE code LIKE $1', [prefix + '%'])).rows;
+  const pattern = new RegExp('^' + prefix + '(\\d+)$');
+  let max = 0;
+  for (const row of rows) {
+    const match = pattern.exec(row.code);
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  const next = max + 1;
+  const code = prefix + String(next);
+  if (!Number.isSafeInteger(next) || code.length > 64) throw new Problem(422, 'NUMBER_EXHAUSTED', '本日加工单号已用完');
+  return code;
+}
+function isUniqueViolation(error: unknown) {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === '23505';
+}
+async function resolveWorkOrderCode(sql: Sql, tenantId: string, requested: string | undefined) {
+  if (requested === undefined) return nextCode(sql, tenantId, 'WO', 'WO');
+  const code = requested.trim();
+  if (!code) return nextDirectWorkOrderCode(sql, tenantId);
+  if ((await sql.query('SELECT id FROM work_orders WHERE code=$1', [code])).rows[0]) throw new Problem(409, 'DUPLICATE', '本企业内已存在相同加工单号');
+  return code;
 }
 async function beginCommand(sql: Sql, command: string, requestKeyValue: string, payloadHash: string) {
   const existing = (await sql.query<{ resource_id: string; payload_hash: string }>('SELECT resource_id,payload_hash FROM command_replays WHERE command=$1 AND request_key=$2', [command, requestKeyValue])).rows[0];
@@ -126,69 +172,82 @@ async function salesView(sql: Sql, id: string) {
   return { order: { ...order, lines, persisted: true, effective: order.approval === 'approved' && (order.lifecycle === 'open' || order.lifecycle === 'closed') } };
 }
 async function taskViews(sql: Sql, workOrderId: string) {
-  const tasks = (await sql.query<TaskRow>('SELECT id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio::text,plan_qty::text,is_output,execution,pause_source,previous_execution,wage_rule_version_id,approved_good::text,approved_defect::text,approved_rework::text,approved_scrap::text,version FROM work_order_tasks WHERE work_order_id=$1 ORDER BY sequence', [workOrderId])).rows;
+  const tasks = (await sql.query<TaskRow>(`SELECT ${taskColumns} FROM work_order_tasks WHERE work_order_id=$1 ORDER BY sequence`, [workOrderId])).rows;
   return tasks.map((task) => {
     const good = q(task.approved_good), plan = q(task.plan_qty), ratio = q(task.unit_ratio);
     const snap = task.process_snapshot;
     return { ...task, unit_ratio: formatDecimal(ratio), plan_qty: formatDecimal(plan), approved_good: formatDecimal(good), approved_defect: formatDecimal(q(task.approved_defect)), approved_rework: formatDecimal(q(task.approved_rework)), approved_scrap: formatDecimal(q(task.approved_scrap)), output_qty: formatDecimal(divFloor(good, ratio)), good_ratio: plan === 0n ? null : formatDecimal(divFloor(good, plan)), auto_inbound_executed: false, process_code: snap.code, process_name: snap.name };
   });
 }
-async function workOrderView(sql: Sql, id: string) {
-  const order = (await sql.query<WoRow>('SELECT id,code,product_id,unit_id,plan_qty::text,sales_order_id,sales_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,execution,order_paused,requires_fg_inspection,close_reason,version,started_at,completed_at,created_at FROM work_orders WHERE id=$1', [id])).rows[0];
+export async function workOrderView(sql: Sql, id: string) {
+  const order = (await sql.query<WoRow>(`SELECT ${woColumns} FROM work_orders WHERE id=$1`, [id])).rows[0];
   if (!order) throw new Problem(404, 'WORK_ORDER_NOT_FOUND', '加工单不存在');
   const tasks = await taskViews(sql, id);
   const materials = (await sql.query<{ id: string; product_id: string; unit_id: string; required_qty: string; issued_qty: string; feeding_process_id: string | null; feeding_task_id: string | null; feeding_ambiguous: boolean; component_snapshot: { code: string; name: string; unit_name: string }; source_paths: string[] }>('SELECT id,product_id,unit_id,required_qty::text,issued_qty::text,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths FROM work_order_materials WHERE work_order_id=$1 ORDER BY component_snapshot->>\'code\'', [id])).rows.map((row) => ({ ...row, required_qty: formatDecimal(q(row.required_qty)), issued_qty: formatDecimal(q(row.issued_qty)), product_code: row.component_snapshot.code, product_name: row.component_snapshot.name, unit_name: row.component_snapshot.unit_name }));
   const output = tasks.find((task) => task.is_output);
   const received = q((await sql.query<{ n: string }>("SELECT coalesce(sum(quantity),0)::text AS n FROM fg_receipts WHERE work_order_id=$1 AND approval='approved'", [id])).rows[0]!.n);
   const cost=await workCosts(sql,id);
-  return { work_order: { ...order, plan_qty: formatDecimal(q(order.plan_qty)), tasks, materials, output_qty: output?.output_qty ?? '0.000000', received_qty: formatDecimal(received), persisted: true, wage_status:cost.wage_status, cost_status:cost.cost_status, auto_inbound_executed: false } };
+  let production_plan_id: string | null = null, production_plan_code = '', production_plan_name = '';
+  if (order.production_plan_line_id) {
+    const plan = (await sql.query<{ id: string; code: string; name: string }>('SELECT p.id,p.code,p.name FROM production_plan_lines pl JOIN production_plans p ON p.tenant_id=pl.tenant_id AND p.id=pl.plan_id WHERE pl.id=$1', [order.production_plan_line_id])).rows[0];
+    if (plan) { production_plan_id = plan.id; production_plan_code = plan.code; production_plan_name = plan.name; }
+  }
+  const contract = order.contract_id ? (await sql.query<{ code: string }>('SELECT code FROM money_contracts WHERE id=$1', [order.contract_id])).rows[0] : undefined;
+  const project = order.project_id ? (await sql.query<{ code: string; name: string }>('SELECT code,name FROM production_projects WHERE id=$1', [order.project_id])).rows[0] : undefined;
+  return { work_order: { ...order, plan_qty: formatDecimal(q(order.plan_qty)), tasks, materials, output_qty: output?.output_qty ?? '0.000000', received_qty: formatDecimal(received), persisted: true, wage_status:cost.wage_status, cost_status:cost.cost_status, auto_inbound_executed: false, production_plan_id, production_plan_code, production_plan_name, contract_code: contract?.code ?? '', project_code: project?.code ?? '', project_name: project?.name ?? '' } };
+}
+async function contractLineForWorkOrder(sql: Sql, lineId: string, quantity: bigint) {
+  const line = (await sql.query<{ id: string; contract_id: string; product_id: string; quantity: string; approval: string }>('SELECT l.id,l.contract_id,l.product_id,l.quantity::text,c.approval FROM money_contract_lines l JOIN money_contracts c ON c.tenant_id=l.tenant_id AND c.id=l.contract_id WHERE l.id=$1 FOR UPDATE OF l, c', [lineId])).rows[0];
+  if (!line) throw new Problem(422, 'CONTRACT_LINE', '合同行不存在');
+  if (!['approved', 'exempt'].includes(line.approval)) throw new Problem(422, 'CONTRACT_NOT_APPROVED', '只能对审核通过或不需审核的合同行下达加工单');
+  const used = q((await sql.query<{ n: string }>("SELECT coalesce(sum(plan_qty),0)::text AS n FROM work_orders WHERE contract_line_id=$1 AND execution<>'cancelled'", [lineId])).rows[0]!.n);
+  if (used + quantity > q(line.quantity)) throw new Problem(422, 'SCHEDULE_EXCEEDS_CONTRACT', '计划数不能超过合同未投产数量');
+  return { ...line, scheduled_qty: formatDecimal(used), remaining_qty: formatDecimal(q(line.quantity) - used) };
 }
 async function lockWorkOrder(sql: Sql, id: string, version?: number) {
-  const row = (await sql.query<WoRow>('SELECT id,code,product_id,unit_id,plan_qty::text,sales_order_id,sales_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,execution,order_paused,requires_fg_inspection,close_reason,version,started_at,completed_at,created_at FROM work_orders WHERE id=$1 FOR UPDATE', [id])).rows[0];
+  const row = (await sql.query<WoRow>(`SELECT ${woColumns} FROM work_orders WHERE id=$1 FOR UPDATE`, [id])).rows[0];
   if (!row) throw new Problem(404, 'WORK_ORDER_NOT_FOUND', '加工单不存在');
   if (version !== undefined && row.version !== version) throw new Problem(409, 'VERSION_CONFLICT', '加工单已被修改，请刷新');
   return row;
 }
 async function tasksOf(sql: Sql, workOrderId: string) {
-  return (await sql.query<TaskRow>('SELECT id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio::text,plan_qty::text,is_output,execution,pause_source,previous_execution,wage_rule_version_id,approved_good::text,approved_defect::text,approved_rework::text,approved_scrap::text,version FROM work_order_tasks WHERE work_order_id=$1 ORDER BY sequence FOR UPDATE', [workOrderId])).rows;
+  return (await sql.query<TaskRow>(`SELECT ${taskColumns} FROM work_order_tasks WHERE work_order_id=$1 ORDER BY sequence FOR UPDATE`, [workOrderId])).rows;
 }
 async function syncExecution(sql: Sql, workOrderId: string) {
   const order = await lockWorkOrder(sql, workOrderId);
   if (order.execution === 'cancelled' || order.execution === 'completed') return;
-  let tasks = await tasksOf(sql, workOrderId);
-  if (!order.order_paused) {
-    const doneBefore = (sequence: number) => tasks.every((task) => task.sequence >= sequence || task.execution === 'completed');
-    if (!tasks.some((task) => task.execution === 'running')) {
-      const next = tasks.find((task) => task.execution === 'not_started' && doneBefore(task.sequence));
-      if (next) {
-        await sql.query("UPDATE work_order_tasks SET execution='running',version=version+1 WHERE id=$1", [next.id]);
-        tasks = await tasksOf(sql, workOrderId);
-      }
-    }
+  const tasks = await tasksOf(sql, workOrderId);
+  if (tasks.length > 0 && tasks.every((task) => task.execution === 'completed')) {
+    await sql.query("UPDATE work_orders SET execution='completed',order_paused=false,completed_at=coalesce(completed_at,now()),version=version+1,updated_at=now() WHERE id=$1", [workOrderId]);
+    return;
   }
   const execution = tasks.some((task) => task.execution === 'running') ? 'running' : order.order_paused || tasks.some((task) => task.execution === 'paused') ? 'paused' : tasks.every((task) => task.execution === 'not_started') ? 'not_started' : 'running';
   await sql.query('UPDATE work_orders SET execution=$1,started_at=CASE WHEN $1=\'running\' AND started_at IS NULL THEN now() ELSE started_at END,version=version+1,updated_at=now() WHERE id=$2', [execution, workOrderId]);
 }
 export async function refreshTaskQuantities(sql: Sql, taskId: string, sync = true) {
   const sums = (await sql.query<{ good: string; defect: string; rework: string; scrap: string; pending: string; undisposed: string }>("SELECT coalesce(sum(good_qty) FILTER (WHERE approval='approved'),0)::text AS good,coalesce(sum(defect_qty) FILTER (WHERE approval='approved'),0)::text AS defect,coalesce(sum(rework_qty) FILTER (WHERE approval='approved'),0)::text AS rework,coalesce(sum(scrap_qty) FILTER (WHERE approval='approved'),0)::text AS scrap,count(*) FILTER (WHERE approval='pending')::text AS pending,count(*) FILTER (WHERE approval='approved' AND defect_qty>rework_qty+scrap_qty)::text AS undisposed FROM production_reports WHERE task_id=$1", [taskId])).rows[0]!;
-  const task = (await sql.query<TaskRow>('SELECT id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio::text,plan_qty::text,is_output,execution,pause_source,previous_execution,wage_rule_version_id,approved_good::text,approved_defect::text,approved_rework::text,approved_scrap::text,version FROM work_order_tasks WHERE id=$1 FOR UPDATE', [taskId])).rows[0];
+  const task = (await sql.query<TaskRow>(`SELECT ${taskColumns} FROM work_order_tasks WHERE id=$1 FOR UPDATE`, [taskId])).rows[0];
   if (!task) throw new Problem(404, 'TASK_NOT_FOUND', '生产任务不存在');
   const repairs=(await sql.query<{good:string;pending:string}>("SELECT coalesce(sum(good_qty) FILTER(WHERE approval='approved'),0)::text AS good,count(*) FILTER(WHERE approval='pending')::text AS pending FROM rework_reports WHERE task_id=$1",[taskId])).rows[0]!;
   sums.pending=(BigInt(sums.pending)+BigInt(repairs.pending)).toString();
   const good = q(sums.good)+q(repairs.good), plan = q(task.plan_qty);
   let execution = task.execution;
-  if (task.execution === 'running' && good >= plan && sums.pending === '0' && sums.undisposed === '0') execution = 'completed';
-  if (task.execution === 'completed' && (good < plan || sums.pending !== '0' || sums.undisposed !== '0') && task.pause_source === 'none') execution = 'running';
-  await sql.query('UPDATE work_order_tasks SET approved_good=$1,approved_defect=$2,approved_rework=$3,approved_scrap=$4,execution=$5,version=version+1 WHERE id=$6', [formatDecimal(good), formatDecimal(q(sums.defect)), formatDecimal(q(sums.rework)), formatDecimal(q(sums.scrap)), execution, taskId]);
+  let completion = task.completion_source;
+  if (task.execution === 'running' && good >= plan && sums.pending === '0') { execution = 'completed'; completion = 'auto'; }
+  if (task.execution === 'completed' && task.completion_source === 'auto' && (good < plan || sums.pending !== '0') && task.pause_source === 'none') { execution = 'running'; completion = 'none'; }
+  await sql.query('UPDATE work_order_tasks SET approved_good=$1,approved_defect=$2,approved_rework=$3,approved_scrap=$4,execution=$5,completion_source=$6,completed_at=CASE WHEN $5=\'completed\' THEN coalesce(completed_at,now()) ELSE NULL END,version=version+1 WHERE id=$7', [formatDecimal(good), formatDecimal(q(sums.defect)), formatDecimal(q(sums.rework)), formatDecimal(q(sums.scrap)), execution, completion, taskId]);
   const order = await lockWorkOrder(sql, task.work_order_id);
-  if (execution !== 'completed') {
-    await sql.query("UPDATE work_order_tasks SET execution='not_started',version=version+1 WHERE work_order_id=$1 AND sequence>$2 AND execution='running' AND pause_source='none' AND NOT EXISTS (SELECT 1 FROM production_reports r WHERE r.task_id=work_order_tasks.id AND r.approval IN ('pending','approved'))", [task.work_order_id, task.sequence]);
-  }
   if (sync && order.execution !== 'completed' && order.execution !== 'cancelled') await syncExecution(sql, task.work_order_id);
 }
 export async function assertOperator(sql: Sql, actor: Actor, processId: string, operatorId: string) {
   if (!(await sql.query('SELECT id FROM tenant_team_members WHERE id=$1', [operatorId])).rows[0]) throw new Problem(422, 'INVALID_OPERATOR', '实际操作者不是本企业启用成员');
-  if (!(await sql.query('SELECT 1 FROM process_reporters WHERE process_id=$1 AND user_id=$2', [processId, operatorId])).rows[0]) throw new Problem(403, 'PROCESS_QUALIFICATION', '实际操作者没有该工序的当前报工资格；历史路线快照不能代替当前授权');
+  const reporters = (await sql.query('SELECT 1 FROM process_reporters WHERE process_id=$1', [processId])).rows;
+  if (!reporters.length) {
+    const openAll = (await sql.query<{ settings: Record<string, unknown> }>('SELECT settings FROM produce_settings')).rows[0]?.settings?.open_all_reporters === true;
+    if (!openAll) throw new Problem(403, 'PROCESS_QUALIFICATION', '该工序未设置生产人员，请先在工序管理里配置');
+  } else if (!(await sql.query('SELECT 1 FROM process_reporters WHERE process_id=$1 AND user_id=$2', [processId, operatorId])).rows[0]) {
+    throw new Problem(403, 'PROCESS_QUALIFICATION', '实际操作者没有该工序的当前报工资格；历史路线快照不能代替当前授权');
+  }
   if (operatorId !== actor.user_id && !actor.permissions.includes('production.approve')) throw new Problem(403, 'PROXY_REPORT_FORBIDDEN', '代报需要生产审核权限，且不能扩大工序资格');
 }
 async function recomputeIssued(sql: Sql, materialIds: string[]) {
@@ -212,8 +271,8 @@ async function inspectionCapacity(sql: Sql, workOrderId: string, quantity: bigin
   if (used + quantity > actualOutput) throw new Problem(422, 'OVER_INSPECTION', '送检量不能超过末道已审核产出减去已送检量；不能重复检验同一批产出');
 }
 
-async function reportView(sql: Sql, id: string, a:Actor) {
-  const row = (await sql.query<{ id: string; code: string; work_order_id: string; task_id: string; process_id: string; reporter_id: string; operator_id: string; good_qty: string; defect_qty: string; rework_qty: string; scrap_qty: string; defect_note: string; note: string; supplement: boolean; approval: string; reject_reason: string; wage_status: string; version: number; created_at: string }>('SELECT id,code,work_order_id,task_id,process_id,reporter_id,operator_id,good_qty::text,defect_qty::text,rework_qty::text,scrap_qty::text,defect_note,note,supplement,approval,reject_reason,wage_status,effective_seconds,version,created_at FROM production_reports WHERE id=$1', [id])).rows[0];
+export async function reportView(sql: Sql, id: string, a:Actor) {
+  const row = (await sql.query<{ id: string; code: string; work_order_id: string; task_id: string; process_id: string; reporter_id: string; operator_id: string; good_qty: string; defect_qty: string; rework_qty: string; scrap_qty: string; defect_note: string; note: string; supplement: boolean; approval: string; reject_reason: string; wage_status: string; effective_seconds: number; started_at: string | null; ended_at: string | null; quality_status: string; settlement_status: string; settled_by: string | null; settled_at: string | null; settlement_note: string; version: number; created_at: string }>('SELECT id,code,work_order_id,task_id,process_id,reporter_id,operator_id,good_qty::text,defect_qty::text,rework_qty::text,scrap_qty::text,defect_note,note,supplement,approval,reject_reason,wage_status,effective_seconds,started_at,ended_at,quality_status,settlement_status,settled_by,settled_at,settlement_note,version,created_at FROM production_reports WHERE id=$1', [id])).rows[0];
   if (!row) throw new Problem(404, 'REPORT_NOT_FOUND', '报工不存在');
   const defect = q(row.defect_qty), rework = q(row.rework_qty), scrap = q(row.scrap_qty);
   return { report: { ...row, good_qty: formatDecimal(q(row.good_qty)), defect_qty: formatDecimal(defect), rework_qty: formatDecimal(rework), scrap_qty: formatDecimal(scrap), disposition_pending: formatDecimal(defect - rework - scrap), ...(await wageView(sql,id,a)), persisted: true, posted: row.approval === 'approved' } };
@@ -246,6 +305,37 @@ async function inspectionView(sql: Sql, id: string) {
   return { inspection: { ...row, inspected_qty: formatDecimal(q(row.inspected_qty)), good_qty: formatDecimal(q(row.good_qty)), defect_qty: formatDecimal(q(row.defect_qty)), accepted_qty: formatDecimal(q(row.accepted_qty)), persisted: true, sampling: '未实现，整批结论由本次显式判定决定' } };
 }
 
+export async function changeTaskExecution(sql: Sql, actor: Actor, workOrderId: string, taskId: string, action: string, version?: number) {
+  const order = await lockWorkOrder(sql, workOrderId);
+  if (order.order_paused || order.execution === 'completed' || order.execution === 'cancelled') throw new Problem(409, 'STATE_TRANSITION', '加工单已完成、已取消或已暂停，不能改任务状态');
+  const task = (await tasksOf(sql, order.id)).find((item) => item.id === taskId);
+  if (!task) throw new Problem(404, 'TASK_NOT_FOUND', '生产任务不存在');
+  if (version !== undefined && task.version !== version) throw new Problem(409, 'VERSION_CONFLICT', '任务已被修改，请刷新');
+  if (action === 'start' || action === 'resume') {
+    if (task.execution === 'running') return workOrderView(sql, order.id);
+    if (!['not_started', 'paused'].includes(task.execution)) throw new Problem(409, 'STATE_TRANSITION', '只有未开始或已暂停的任务可以开始');
+    if (task.execution === 'paused' && task.pause_source === 'order') throw new Problem(409, 'STATE_TRANSITION', '整单暂停中不能单独开始任务');
+    const next = task.execution === 'paused' ? (task.previous_execution === 'not_started' ? 'not_started' : 'running') : 'running';
+    await sql.query("UPDATE work_order_tasks SET execution=$2,pause_source='none',previous_execution=NULL,started_at=CASE WHEN $2='running' THEN coalesce(started_at,now()) ELSE started_at END,version=version+1 WHERE id=$1", [task.id, next]);
+    if (next === 'running' && task.execution === 'paused') await refreshTaskQuantities(sql, task.id, false);
+  } else if (action === 'pause') {
+    if (task.execution === 'paused') return workOrderView(sql, order.id);
+    if (!['running', 'not_started'].includes(task.execution)) throw new Problem(409, 'STATE_TRANSITION', '只有未开始或进行中的任务可以暂停');
+    await sql.query("UPDATE work_order_tasks SET previous_execution=execution,execution='paused',pause_source='manual',version=version+1 WHERE id=$1", [task.id]);
+  } else if (action === 'complete') {
+    if (task.execution === 'completed') return workOrderView(sql, order.id);
+    if (task.execution === 'paused' && task.pause_source === 'order') throw new Problem(409, 'STATE_TRANSITION', '整单暂停中不能单独完成任务');
+    await sql.query("UPDATE work_order_tasks SET execution='completed',completion_source='manual',completed_at=now(),pause_source='none',previous_execution=NULL,version=version+1 WHERE id=$1", [task.id]);
+  } else if (action === 'reset') {
+    if ((await sql.query("SELECT id FROM production_reports WHERE task_id=$1 AND approval IN ('pending','approved') LIMIT 1", [task.id])).rows[0]) throw new Problem(409, 'REPORTS_EXIST', '已有报工的任务不能改回未开始');
+    if (task.execution === 'not_started' && task.pause_source === 'none') return workOrderView(sql, order.id);
+    await sql.query("UPDATE work_order_tasks SET execution='not_started',pause_source='none',previous_execution=NULL,completion_source='none',started_at=NULL,completed_at=NULL,version=version+1 WHERE id=$1", [task.id]);
+  } else throw new Problem(422, 'INVALID_ACTION', '不支持的任务操作');
+  await syncExecution(sql, order.id);
+  const body = await workOrderView(sql, order.id);
+  await writeAudit(sql, actor, `task.${action}`, 'work_order_task', task.id, { pause_source: task.pause_source, execution: task.execution }, body.work_order.tasks.find((item) => item.id === task.id));
+  return body;
+}
 export function registerProduction(app: FastifyInstance, services: Services) {
   const { database, authorize, context, actor } = services;
   const guard = authorize();
@@ -360,65 +450,117 @@ export function registerProduction(app: FastifyInstance, services: Services) {
     return { replayed: false, ...body };
   }));
 
-  app.get<{ Querystring: { reportable?: string } }>('/api/work-orders', { preHandler: guard, schema: { querystring: { type: 'object', additionalProperties: false, properties: { reportable: { type: 'string', enum: ['1', 'true'] } } } } }, (request) => database.tenant(context(request), async (sql) => {
+  app.get<{ Querystring: { reportable?: string; page?: string; page_size?: string; pageSize?: string; limit?: string; offset?: string } }>('/api/work-orders', { preHandler: guard, schema: { querystring: { type: 'object', additionalProperties: false, properties: {
+    reportable: { type: 'string', enum: ['1', 'true'] },
+    page: { type: 'string', pattern: '^[1-9]\\d{0,5}$' },
+    page_size: { type: 'string', pattern: '^[1-9]\\d{0,2}$' },
+    pageSize: { type: 'string', pattern: '^[1-9]\\d{0,2}$' },
+    limit: { type: 'string', pattern: '^[1-9]\\d{0,2}$' },
+    offset: { type: 'string', pattern: '^\\d{1,6}$' },
+  } } } }, (request) => database.tenant(context(request), async (sql) => {
     const a = actor(request); permit(a, 'production.read'); requireAllScope(a);
     const reportable = request.query.reportable === '1' || request.query.reportable === 'true';
+    const qy = request.query;
+    const pageSize = Math.min(200, Math.max(1, Number(qy.page_size ?? qy.pageSize ?? qy.limit ?? '200') || 200));
+    const page = Math.max(1, Number(qy.page ?? '1') || 1);
+    const offset = qy.offset != null ? Math.max(0, Number(qy.offset) || 0) : (page - 1) * pageSize;
     const ids = reportable
       ? (await sql.query<{ id: string }>(a.permissions.includes('production.approve')
-        ? "SELECT w.id FROM work_orders w WHERE w.execution='running' AND EXISTS (SELECT 1 FROM work_order_tasks t WHERE t.work_order_id=w.id AND t.execution='running') ORDER BY w.created_at DESC LIMIT 200"
-        : "SELECT w.id FROM work_orders w WHERE w.execution='running' AND EXISTS (SELECT 1 FROM work_order_tasks t JOIN process_reporters r ON r.tenant_id=t.tenant_id AND r.process_id=t.process_id AND r.user_id=$1 WHERE t.work_order_id=w.id AND t.execution='running') ORDER BY w.created_at DESC LIMIT 200", a.permissions.includes('production.approve') ? [] : [a.user_id])).rows
-      : (await sql.query<{ id: string }>('SELECT id FROM work_orders ORDER BY created_at DESC LIMIT 200')).rows;
-    return { items: await Promise.all(ids.map(async (row) => (await workOrderView(sql, row.id)).work_order)), total: Number((await sql.query<{ n: string }>('SELECT count(*)::text AS n FROM work_orders')).rows[0]!.n), limit: 200 };
+        ? "SELECT w.id FROM work_orders w WHERE w.execution='running' AND EXISTS (SELECT 1 FROM work_order_tasks t WHERE t.work_order_id=w.id AND t.execution='running') ORDER BY w.created_at DESC LIMIT $1 OFFSET $2"
+        : "SELECT w.id FROM work_orders w WHERE w.execution='running' AND EXISTS (SELECT 1 FROM work_order_tasks t JOIN process_reporters r ON r.tenant_id=t.tenant_id AND r.process_id=t.process_id AND r.user_id=$1 WHERE t.work_order_id=w.id AND t.execution='running') ORDER BY w.created_at DESC LIMIT $2 OFFSET $3", a.permissions.includes('production.approve') ? [pageSize, offset] : [a.user_id, pageSize, offset])).rows
+      : (await sql.query<{ id: string }>('SELECT id FROM work_orders ORDER BY created_at DESC LIMIT $1 OFFSET $2', [pageSize, offset])).rows;
+    const total = Number((await sql.query<{ n: string }>('SELECT count(*)::text AS n FROM work_orders')).rows[0]!.n);
+    return { items: await Promise.all(ids.map(async (row) => (await workOrderView(sql, row.id)).work_order)), total, page, page_size: pageSize, limit: pageSize };
   }));
   app.get<{ Params: { id: string } }>('/api/work-orders/:id', { preHandler: guard, schema: { params: idParams } }, (request) => database.tenant(context(request), async (sql) => { permit(actor(request), 'production.read'); requireAllScope(actor(request)); return workOrderView(sql, request.params.id); }));
-  app.post<{ Body: { request_key: string; sales_line_id: string; quantity: string; route_version_id: string; bom_version_id: string; warehouse_id: string; requires_fg_inspection?: boolean; require_cost?: boolean; unit_ratios?: { sequence: number; unit_ratio: string }[] } }>('/api/work-orders', { preHandler: guard, schema: { body: object(['request_key', 'sales_line_id', 'quantity', 'route_version_id', 'bom_version_id', 'warehouse_id'], { request_key: requestKey, sales_line_id: uuid, quantity: decimalField, route_version_id: uuid, bom_version_id: uuid, warehouse_id: uuid, requires_fg_inspection: { type: 'boolean' }, require_cost: { type: 'boolean' }, unit_ratios: { type: 'array', maxItems: 100, items: object(['sequence', 'unit_ratio'], { sequence: { type: 'integer', minimum: 1 }, unit_ratio: decimalField }) } }, ['requires_fg_inspection', 'require_cost', 'unit_ratios']) } }, async (request, reply) => {
-    const hash = digest({ ...request.body, requires_fg_inspection: request.body.requires_fg_inspection ?? false, unit_ratios: request.body.unit_ratios ?? [] });
+  app.post<{ Body: WoCreate }>('/api/work-orders', { preHandler: guard, schema: { body: object(['request_key', 'quantity'], { request_key: requestKey, quantity: decimalField, warehouse_id: uuid, sales_line_id: uuid, contract_line_id: uuid, route_version_id: uuid, bom_version_id: uuid, product_id: uuid, production_plan_line_id: uuid, code: optionalCode, requires_fg_inspection: { type: 'boolean' }, require_cost: { type: 'boolean' }, priority: { type: 'string', enum: ['none', 'urgent', 'normal', 'delayed'] }, due_date: nullableDate, planned_start: nullableDate, planned_end: nullableDate, note: { type: 'string', maxLength: 255 }, unit_ratios: { type: 'array', maxItems: 100, items: object(['sequence', 'unit_ratio'], { sequence: { type: 'integer', minimum: 1 }, unit_ratio: decimalField }) }, tasks: { type: 'array', maxItems: 100, items: object(['process_id'], { process_id: uuid, unit_ratio: decimalField, pricing_mode: { type: 'string', enum: ['piece', 'time'] }, wage_rate: { anyOf: [rateField, { type: 'null' }] }, route_step_id: nullableUuid }, ['unit_ratio', 'pricing_mode', 'wage_rate', 'route_step_id']) } }, ['warehouse_id', 'sales_line_id', 'contract_line_id', 'route_version_id', 'bom_version_id', 'product_id', 'production_plan_line_id', 'code', 'requires_fg_inspection', 'require_cost', 'priority', 'due_date', 'planned_start', 'planned_end', 'note', 'unit_ratios', 'tasks']) } }, async (request, reply) => {
+    const hash = digest({ ...request.body, sales_line_id: request.body.sales_line_id ?? null, contract_line_id: request.body.contract_line_id ?? null, route_version_id: request.body.route_version_id ?? null, bom_version_id: request.body.bom_version_id ?? null, product_id: request.body.product_id ?? null, production_plan_line_id: request.body.production_plan_line_id ?? null, code: request.body.code ?? null, priority: request.body.priority ?? 'none', due_date: request.body.due_date ?? null, planned_start: request.body.planned_start ?? null, planned_end: request.body.planned_end ?? null, note: request.body.note ?? '', tasks: request.body.tasks ?? [], requires_fg_inspection: request.body.requires_fg_inspection ?? false, unit_ratios: request.body.unit_ratios ?? [] });
     const created = await run(request, async (sql, a) => {
       permit(a, 'production.write');
       const replay = await beginCommand(sql, 'work_order.create', request.body.request_key, hash);
       if (replay) return { replayed: true, ...(await workOrderView(sql, replay)) };
       const quantity = decimal(request.body.quantity, { positive: true });
-      await activeWarehouse(sql, request.body.warehouse_id);
-      const line = (await sql.query<{ id: string; order_id: string; product_id: string; unit_id: string; quantity: string; scheduled_qty: string; lifecycle: string; approval: string }>('SELECT l.id,l.order_id,l.product_id,l.unit_id,l.quantity::text,l.scheduled_qty::text,o.lifecycle,o.approval FROM sales_order_lines l JOIN sales_orders o ON o.tenant_id=l.tenant_id AND o.id=l.order_id WHERE l.id=$1 FOR UPDATE OF l,o', [request.body.sales_line_id])).rows[0];
-      if (!line || line.lifecycle !== 'open' || line.approval !== 'approved') throw new Problem(422, 'SALES_LINE_NOT_OPEN', '只能对已审核开放的销售行下达加工单');
-      if (q(line.scheduled_qty) + quantity > q(line.quantity)) throw new Problem(422, 'SCHEDULE_EXCEEDS_ORDER', '排产数量不能超过销售行未排数量');
-      await activeProduct(sql, line.product_id);
-      const bom = await loadBom(sql, request.body.bom_version_id);
-      if (bom.version.parent_snapshot.id !== line.product_id) throw new Problem(422, 'PRODUCT_MISMATCH', 'BOM父件必须与销售行产品一致');
-      if (bom.version.parent_snapshot.attribute !== 'manufactured') throw new Problem(422, 'PARENT_NOT_MANUFACTURED', '当前只为制造产品下达加工单');
-      if (bom.version.parent_snapshot.unit_id !== line.unit_id) throw new Problem(422, 'UNIT_MISMATCH', '销售行单位与BOM父件单位不一致，当前不作换算');
-      if (bom.version.route_version_id && bom.version.route_version_id !== request.body.route_version_id) throw new Problem(422, 'ROUTE_BOM_MISMATCH', 'BOM已绑定路线版本时，加工单必须冻结同一路线版本');
-      const route = await routeSteps(sql, request.body.route_version_id);
+      const warehouseId = request.body.warehouse_id ?? (await sql.query<{ id: string }>('SELECT id FROM warehouses WHERE active ORDER BY created_at LIMIT 1')).rows[0]?.id;
+      if (!warehouseId) throw new Problem(422, 'WAREHOUSE', '请先维护仓库');
+      await activeWarehouse(sql, warehouseId);
+      calendarDate(request.body.due_date); calendarDate(request.body.planned_start); calendarDate(request.body.planned_end);
+      let salesOrderId: string | null = null, salesLineId: string | null = null, contractId: string | null = null, contractLineId: string | null = null, productId = request.body.product_id ?? '', unitId = '';
+      if (request.body.sales_line_id && request.body.contract_line_id) throw new Problem(422, 'SOURCE_CONFLICT', '加工单不能同时来自销售订单和合同订单');
+      if (request.body.sales_line_id) {
+        const line = (await sql.query<{ id: string; order_id: string; product_id: string; unit_id: string; quantity: string; scheduled_qty: string; lifecycle: string; approval: string }>('SELECT l.id,l.order_id,l.product_id,l.unit_id,l.quantity::text,l.scheduled_qty::text,o.lifecycle,o.approval FROM sales_order_lines l JOIN sales_orders o ON o.tenant_id=l.tenant_id AND o.id=l.order_id WHERE l.id=$1 FOR UPDATE OF l,o', [request.body.sales_line_id])).rows[0];
+        if (!line || line.lifecycle !== 'open' || line.approval !== 'approved') throw new Problem(422, 'SALES_LINE_NOT_OPEN', '只能对已审核开放的销售行下达加工单');
+        if (q(line.scheduled_qty) + quantity > q(line.quantity)) throw new Problem(422, 'SCHEDULE_EXCEEDS_ORDER', '排产数量不能超过销售行未排数量');
+        salesOrderId = line.order_id; salesLineId = line.id; productId = line.product_id; unitId = line.unit_id;
+      } else if (request.body.contract_line_id) {
+        const line = await contractLineForWorkOrder(sql, request.body.contract_line_id, quantity);
+        contractId = line.contract_id; contractLineId = line.id; productId = line.product_id;
+      } else if (!request.body.product_id) throw new Problem(422, 'PRODUCT_REQUIRED', '请选择商品');
+      const product = await activeProduct(sql, productId);
+      if (!unitId) unitId = product.unit_id;
+      const bom = request.body.bom_version_id ? await loadBom(sql, request.body.bom_version_id) : null;
+      if (bom) {
+        if (bom.version.parent_snapshot.id !== product.id) throw new Problem(422, 'PRODUCT_MISMATCH', 'BOM父件必须与加工单商品一致');
+        if (bom.version.parent_snapshot.attribute !== 'manufactured') throw new Problem(422, 'PARENT_NOT_MANUFACTURED', '当前只为制造产品下达加工单');
+        if (bom.version.parent_snapshot.unit_id !== unitId) throw new Problem(422, 'UNIT_MISMATCH', '销售行单位与BOM父件单位不一致，当前不作换算');
+        if (bom.version.route_version_id && bom.version.route_version_id !== (request.body.route_version_id ?? null)) throw new Problem(422, 'ROUTE_BOM_MISMATCH', 'BOM已绑定路线版本时，加工单必须冻结同一路线版本');
+      }
+      const route = request.body.route_version_id ? await routeSteps(sql, request.body.route_version_id) : null;
       if (new Set((request.body.unit_ratios ?? []).map((item) => item.sequence)).size !== (request.body.unit_ratios ?? []).length) throw new Problem(422, 'DUPLICATE_UNIT_RATIO', '同一工序序号不能指定多条单位关系');
       const ratios = new Map((request.body.unit_ratios ?? []).map((item) => [item.sequence, item.unit_ratio]));
-      if ([...ratios.keys()].some((sequence) => !route.steps.some((step) => step.sequence === sequence))) throw new Problem(422, 'UNIT_RATIO', '单位关系必须对应冻结路线中的工序序号');
-      const product = bom.version.parent_snapshot;
-      const id = (await sql.query<{ id: string }>('INSERT INTO work_orders(tenant_id,code,product_id,unit_id,plan_qty,sales_order_id,sales_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15) RETURNING id', [a.tenant_id, await nextCode(sql, a.tenant_id, 'WO', 'WO'), product.id, line.unit_id, formatDecimal(quantity), line.order_id, line.id, route.version.id, bom.version.id, request.body.warehouse_id, JSON.stringify(product), route.version.name_snapshot, bom.version.revision, request.body.requires_fg_inspection ?? false, a.user_id])).rows[0]!.id;
+      if (route && [...ratios.keys()].some((sequence) => !route.steps.some((step) => step.sequence === sequence))) throw new Problem(422, 'UNIT_RATIO', '单位关系必须对应冻结路线中的工序序号');
+      type Planned = { sequence: number; process_id: string; route_step_id: string | null; unit_ratio: string; pricing_mode?: 'piece' | 'time'; wage_rate?: string | null; auto_inbound: boolean };
+      let planned: Planned[] = [];
+      if (request.body.tasks?.length) {
+        planned = request.body.tasks.map((task, index) => ({ sequence: index + 1, process_id: task.process_id, route_step_id: task.route_step_id ?? null, unit_ratio: task.unit_ratio ?? '1', pricing_mode: task.pricing_mode, wage_rate: task.wage_rate, auto_inbound: false }));
+      } else if (route) {
+        planned = route.steps.map((step) => ({ sequence: step.sequence, process_id: step.process_id, route_step_id: step.id, unit_ratio: ratios.get(step.sequence) ?? '1', auto_inbound: step.auto_inbound }));
+      } else throw new Problem(422, 'TASKS_REQUIRED', '请至少添加一道工序');
+      const generated = request.body.code !== undefined && !request.body.code.trim();
+      let id = '';
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const code = await resolveWorkOrderCode(sql, a.tenant_id, request.body.code);
+        await sql.query('SAVEPOINT wo_code');
+        try {
+          id = (await sql.query<{ id: string }>('INSERT INTO work_orders(tenant_id,code,product_id,unit_id,plan_qty,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,created_by,priority,due_date,planned_start,planned_end,note,production_plan_line_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id', [a.tenant_id, code, product.id, unitId, formatDecimal(quantity), salesOrderId, salesLineId, contractId, contractLineId, route?.version.id ?? null, bom?.version.id ?? null, warehouseId, JSON.stringify(product), route?.version.name_snapshot ?? '', bom?.version.revision ?? null, request.body.requires_fg_inspection ?? false, a.user_id, request.body.priority ?? 'none', request.body.due_date ?? null, request.body.planned_start ?? null, request.body.planned_end ?? null, request.body.note ?? '', request.body.production_plan_line_id ?? null])).rows[0]!.id;
+          await sql.query('RELEASE SAVEPOINT wo_code');
+          break;
+        } catch (error) {
+          await sql.query('ROLLBACK TO SAVEPOINT wo_code');
+          if (!generated || !isUniqueViolation(error) || attempt === 7) throw error;
+        }
+      }
       await sql.query('UPDATE work_orders SET cost_required=$1 WHERE id=$2',[request.body.require_cost??false,id]);
-      const taskIds = new Map<number, string>();
-      for (const step of route.steps) {
-        const ratio = decimal(ratios.get(step.sequence) ?? '1', { positive: true });
+      const taskIds = new Map<string, string>();
+      for (const step of planned) {
+        const proc = (await sql.query<{ id: string; code: string; name: string; standard_minutes: string; pricing_mode: string; wage_rate: string | null; inspection_scheme: string; reporter_ids: string[]; active: boolean; need_outsource: boolean }>("SELECT p.id,p.code,p.name,p.standard_minutes::text,p.pricing_mode,p.wage_rate::text,p.inspection_scheme,p.active,COALESCE(p.need_outsource,false) AS need_outsource,COALESCE((SELECT jsonb_agg(r.user_id ORDER BY r.user_id) FROM process_reporters r WHERE r.process_id=p.id),'[]'::jsonb) AS reporter_ids FROM processes p WHERE p.id=$1", [step.process_id])).rows[0];
+        if (!proc?.active) throw new Problem(422, 'INACTIVE_REFERENCE', '工序不存在、已停用或不属于当前企业');
+        const ratio = decimal(step.unit_ratio, { positive: true });
         const plan = mulCeil(quantity, ratio);
-        const taskId = (await sql.query<{ id: string }>('INSERT INTO work_order_tasks(tenant_id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio,plan_qty,is_output) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9) RETURNING id', [a.tenant_id, id, step.sequence, step.id, step.process_id, JSON.stringify({ code: step.process_code, name: step.process_name, standard_minutes: step.standard_minutes, reporter_ids: step.reporter_ids, auto_inbound: step.auto_inbound }), formatDecimal(ratio), formatDecimal(plan), step.sequence === route.steps[route.steps.length - 1]!.sequence])).rows[0]!.id;
-        taskIds.set(step.sequence, taskId);
+        const mode = step.pricing_mode ?? proc.pricing_mode;
+        const wageRate = step.wage_rate !== undefined ? step.wage_rate : proc.wage_rate;
+        const taskKind = proc.need_outsource ? 'outsource' : 'production';
+        const taskId = (await sql.query<{ id: string }>('INSERT INTO work_order_tasks(tenant_id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio,plan_qty,is_output,pricing_mode,wage_rate,inspection_scheme,task_kind) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13) RETURNING id', [a.tenant_id, id, step.sequence, step.route_step_id, proc.id, JSON.stringify({ code: proc.code, name: proc.name, standard_minutes: proc.standard_minutes, reporter_ids: proc.reporter_ids, auto_inbound: step.auto_inbound }), formatDecimal(ratio), formatDecimal(plan), step.sequence === planned[planned.length - 1]!.sequence, mode, wageRate, proc.inspection_scheme, taskKind])).rows[0]!.id;
+        taskIds.set(proc.id + ':' + step.sequence, taskId);
       }
-      const materials = await explode(sql, bom.version.id, formatDecimal(quantity));
-      for (const material of materials) {
-        await activeProduct(sql, material.product_id);
-        if (!(await sql.query('SELECT id FROM units WHERE id=$1 AND active', [material.unit_id])).rows[0]) throw new Problem(422, 'INACTIVE_REFERENCE', '冻结物料的计量单位已停用，不能下达新加工单');
-        const matches = route.steps.filter((step) => step.process_id === material.feeding);
-        const taskId = !material.ambiguous && matches.length === 1 ? taskIds.get(matches[0]!.sequence) ?? null : null;
-        await sql.query('INSERT INTO work_order_materials(tenant_id,work_order_id,product_id,unit_id,required_qty,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb)', [a.tenant_id, id, material.product_id, material.unit_id, formatDecimal(material.amount), material.ambiguous ? null : material.feeding, taskId, material.ambiguous || matches.length > 1, JSON.stringify({ code: material.code, name: material.name, unit_name: material.unit_name }), JSON.stringify(material.paths)]);
+      if (bom) {
+        const materials = await explode(sql, bom.version.id, formatDecimal(quantity));
+        for (const material of materials) {
+          await activeProduct(sql, material.product_id);
+          if (!(await sql.query('SELECT id FROM units WHERE id=$1 AND active', [material.unit_id])).rows[0]) throw new Problem(422, 'INACTIVE_REFERENCE', '冻结物料的计量单位已停用，不能下达新加工单');
+          const matches = planned.filter((step) => step.process_id === material.feeding);
+          const taskId = !material.ambiguous && matches.length === 1 ? taskIds.get(matches[0]!.process_id + ':' + matches[0]!.sequence) ?? null : null;
+          await sql.query('INSERT INTO work_order_materials(tenant_id,work_order_id,product_id,unit_id,required_qty,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb)', [a.tenant_id, id, material.product_id, material.unit_id, formatDecimal(material.amount), material.ambiguous ? null : material.feeding, taskId, material.ambiguous || matches.length > 1, JSON.stringify({ code: material.code, name: material.name, unit_name: material.unit_name }), JSON.stringify(material.paths)]);
+        }
       }
-      await recomputeScheduled(sql, line.id);
+      if (salesLineId) await recomputeScheduled(sql, salesLineId);
       await finishCommand(sql, a.tenant_id, 'work_order.create', request.body.request_key, hash, 'work_order', id);
       const body = await workOrderView(sql, id);
-      await writeAudit(sql, a, 'work_order.created', 'work_order', id, null, { id, route_version_id: route.version.id, bom_version_id: bom.version.id, plan_qty: formatDecimal(quantity), materials: body.work_order.materials });
+      await writeAudit(sql, a, 'work_order.created', 'work_order', id, null, { id, route_version_id: route?.version.id ?? null, bom_version_id: bom?.version.id ?? null, plan_qty: formatDecimal(quantity), materials: body.work_order.materials });
       return { replayed: false, ...body };
     });
     return reply.code(created.replayed ? 200 : 201).send(created);
   });
-  app.post<{ Params: { id: string }; Body: { action: string; version: number; reason?: string; request_key?: string } }>('/api/work-orders/:id/actions', { preHandler: guard, schema: { params: idParams, body: object(['action', 'version'], { action: { type: 'string', enum: ['start', 'pause', 'resume', 'complete', 'cancel'] }, version: versionField, reason: reasonText, request_key: requestKey }, ['reason', 'request_key']) } }, (request) => run(request, async (sql, a) => {
+  app.post<{ Params: { id: string }; Body: { action: string; version: number; reason?: string; request_key?: string } }>('/api/work-orders/:id/actions', { preHandler: guard, schema: { params: idParams, body: object(['action', 'version'], { action: { type: 'string', enum: ['start', 'pause', 'resume', 'complete', 'cancel', 'withdraw'] }, version: versionField, reason: reasonText, request_key: requestKey }, ['reason', 'request_key']) } }, (request) => run(request, async (sql, a) => {
     permit(a, 'production.write');
     const action = request.body.action;
     const hash = digest({ id: request.params.id, ...request.body, reason: request.body.reason ?? '' });
@@ -426,9 +568,8 @@ export function registerProduction(app: FastifyInstance, services: Services) {
     const order = await lockWorkOrder(sql, request.params.id, request.body.version);
     if (action === 'start') {
       if (order.execution !== 'not_started' || order.order_paused) throw new Problem(409, 'STATE_TRANSITION', '只有未开始的加工单可以开工');
-      const short = (await sql.query<{ id: string }>('SELECT id FROM work_order_materials WHERE work_order_id=$1 AND issued_qty<required_qty LIMIT 1', [order.id])).rows[0];
-      if (short) throw new Problem(422, 'MATERIALS_NOT_READY', '按当前暂定规则，开工前须领足冻结物料需求');
       await sql.query('UPDATE work_orders SET order_paused=false,updated_at=now() WHERE id=$1', [order.id]);
+      await sql.query("UPDATE work_order_tasks SET execution='running',started_at=coalesce(started_at,now()),version=version+1 WHERE id=(SELECT id FROM work_order_tasks WHERE work_order_id=$1 AND execution='not_started' ORDER BY sequence LIMIT 1)", [order.id]);
       await syncExecution(sql, order.id);
     } else     if (action === 'pause') {
       const tasks = await tasksOf(sql, order.id);
@@ -464,78 +605,130 @@ export function registerProduction(app: FastifyInstance, services: Services) {
       await releaseReservations(sql,a,order.id);
       await sql.query("UPDATE work_orders SET execution='cancelled',order_paused=false,close_reason=$2,version=version+1,updated_at=now() WHERE id=$1", [order.id, request.body.reason!.trim()]);
       await sql.query("UPDATE work_order_tasks SET execution='cancelled',version=version+1 WHERE work_order_id=$1 AND execution<>'completed'", [order.id]);
-      await recomputeScheduled(sql, order.sales_line_id);
+      if (order.sales_line_id) await recomputeScheduled(sql, order.sales_line_id);
+    } else if (action === 'withdraw') {
+      if (order.order_paused || order.execution === 'not_started' || order.execution === 'cancelled') throw new Problem(409, 'STATE_TRANSITION', '当前状态不能撤回');
+      if (order.execution === 'completed') {
+        await sql.query("UPDATE work_orders SET execution='running',completed_at=NULL,version=version+1,updated_at=now() WHERE id=$1", [order.id]);
+        await sql.query("UPDATE work_order_tasks SET execution='running',completed_at=NULL,completion_source='none',version=version+1 WHERE work_order_id=$1 AND execution='completed'", [order.id]);
+      } else if (order.execution === 'running' || order.execution === 'paused') {
+        await sql.query("UPDATE work_orders SET execution='not_started',order_paused=false,started_at=NULL,version=version+1,updated_at=now() WHERE id=$1", [order.id]);
+        await sql.query("UPDATE work_order_tasks SET execution='not_started',started_at=NULL,completed_at=NULL,completion_source='none',pause_source='none',previous_execution=NULL,version=version+1 WHERE work_order_id=$1", [order.id]);
+      } else {
+        throw new Problem(409, 'STATE_TRANSITION', '当前状态不能撤回');
+      }
+      await writeAudit(sql, a, 'work_order.withdraw', 'work_order', order.id, { execution: order.execution }, { message: order.execution === 'completed' ? '修改加工单状态 / 修改状态为：生产中' : '修改加工单状态 / 修改状态为：未开始' });
     }
     if (request.body.request_key) await finishCommand(sql, a.tenant_id, `work_order.${action}`, request.body.request_key, hash, 'work_order', order.id);
     const body = await workOrderView(sql, order.id);
     await writeAudit(sql, a, `work_order.${action}`, 'work_order', order.id, { execution: order.execution, version: order.version }, { execution: body.work_order.execution, version: body.work_order.version });
     return { replayed: false, ...body };
   }));
-  app.post<{ Params: { id: string; taskId: string }; Body: { action: string; version: number; reason?: string } }>('/api/work-orders/:id/tasks/:taskId/actions', { preHandler: guard, schema: { params: object(['id', 'taskId'], { id: uuid, taskId: uuid }), body: object(['action', 'version'], { action: { type: 'string', enum: ['pause', 'resume'] }, version: versionField, reason: reasonText }, ['reason']) } }, (request) => run(request, async (sql, a) => {
+  app.post<{ Params: { id: string; taskId: string }; Body: { action: string; version: number; reason?: string } }>('/api/work-orders/:id/tasks/:taskId/actions', { preHandler: guard, schema: { params: object(['id', 'taskId'], { id: uuid, taskId: uuid }), body: object(['action', 'version'], { action: { type: 'string', enum: ['start', 'pause', 'resume', 'complete', 'reset'] }, version: versionField, reason: { type: 'string', maxLength: 500 } }, ['reason']) } }, (request) => run(request, async (sql, a) => {
+    permit(a, 'production.write');
+    return changeTaskExecution(sql, a, request.params.id, request.params.taskId, request.body.action, request.body.version);
+  }));
+  app.patch<{ Params: { id: string; taskId: string }; Body: { version: number; pricing_mode: 'piece' | 'time'; wage_rate: string | null } }>('/api/work-orders/:id/tasks/:taskId', { preHandler: guard, schema: { params: object(['id', 'taskId'], { id: uuid, taskId: uuid }), body: object(['version', 'pricing_mode', 'wage_rate'], { version: versionField, pricing_mode: { type: 'string', enum: ['piece', 'time'] }, wage_rate: { anyOf: [rateField, { type: 'null' }] } }) } }, (request) => run(request, async (sql, a) => {
     permit(a, 'production.write');
     const order = await lockWorkOrder(sql, request.params.id);
-    if (order.order_paused || order.execution === 'completed' || order.execution === 'cancelled') throw new Problem(409, 'STATE_TRANSITION', '工单暂停、完工或取消后不能单独改任务暂停');
     const task = (await tasksOf(sql, order.id)).find((item) => item.id === request.params.taskId);
-    if (!task || task.version !== request.body.version) throw new Problem(task ? 409 : 404, task ? 'VERSION_CONFLICT' : 'TASK_NOT_FOUND', task ? '任务已被修改，请刷新' : '生产任务不存在');
-    if (request.body.action === 'pause') {
-      if (task.execution !== 'running' || task.pause_source !== 'none') throw new Problem(409, 'STATE_TRANSITION', '只有执行中的任务可以手工暂停');
-      needReason(request.body.reason, '手工暂停必须填写原因');
-      await sql.query("UPDATE work_order_tasks SET previous_execution='running',execution='paused',pause_source='manual',version=version+1 WHERE id=$1", [task.id]);
-    } else {
-      if (task.pause_source !== 'manual') throw new Problem(409, 'STATE_TRANSITION', '只能恢复本任务自己的手工暂停');
-      await sql.query('UPDATE work_order_tasks SET execution=$2,pause_source=\'none\',previous_execution=NULL,version=version+1 WHERE id=$1', [task.id, task.previous_execution ?? 'running']);
-      await refreshTaskQuantities(sql, task.id, false);
-    }
-    await syncExecution(sql, order.id);
+    if (!task) throw new Problem(404, 'TASK_NOT_FOUND', '生产任务不存在');
+    if (task.version !== request.body.version) throw new Problem(409, 'VERSION_CONFLICT', '任务已被修改，请刷新');
+    await sql.query('UPDATE work_order_tasks SET pricing_mode=$1,wage_rate=$2,version=version+1 WHERE id=$3', [request.body.pricing_mode, request.body.wage_rate, task.id]);
     const body = await workOrderView(sql, order.id);
-    await writeAudit(sql, a, `task.${request.body.action}`, 'work_order_task', task.id, { pause_source: task.pause_source, execution: task.execution }, body.work_order.tasks.find((item) => item.id === task.id));
+    await writeAudit(sql, a, 'task.repriced', 'work_order_task', task.id, { pricing_mode: task.pricing_mode, wage_rate: task.wage_rate }, body.work_order.tasks.find((item) => item.id === task.id));
     return body;
   }));
 
-  app.get<{ Querystring: { work_order_id?: string } }>('/api/production-reports', { preHandler: guard, schema: { querystring: { type: 'object', additionalProperties: false, properties: { work_order_id: uuid } } } }, (request) => database.tenant(context(request), async (sql) => {
-    permit(actor(request), 'production.read'); requireAllScope(actor(request));
-    const ids = (await sql.query<{ id: string }>(request.query.work_order_id ? 'SELECT id FROM production_reports WHERE work_order_id=$1 ORDER BY created_at DESC LIMIT 200' : 'SELECT id FROM production_reports ORDER BY created_at DESC LIMIT 200', request.query.work_order_id ? [request.query.work_order_id] : [])).rows;
-    return { items: await Promise.all(ids.map(async (row) => (await reportView(sql, row.id,actor(request))).report)) };
+  app.get<{ Querystring: { work_order_id?: string; task_id?: string; operator_id?: string; report_type?: string; quality_status?: string; settlement_status?: string; page?: string; page_size?: string } }>('/api/production-reports', { preHandler: guard, schema: { querystring: { type: 'object', additionalProperties: false, properties: { work_order_id: uuid, task_id: uuid, operator_id: uuid, report_type: { type: 'string', enum: ['all', 'production', 'odd', 'rework'] }, quality_status: { type: 'string', enum: ['pending', 'done', 'none'] }, settlement_status: { type: 'string', enum: ['unsettled', 'settled'] }, page: { type: 'string', pattern: '^[1-9]\\d{0,5}$' }, page_size: { type: 'string', pattern: '^[1-9]\\d{0,2}$' } } } } }, (request) => database.tenant(context(request), async (sql) => {
+    const a = actor(request); permit(a, 'production.read'); requireAllScope(a);
+    const qy = request.query;
+    const where = ['TRUE'];
+    const params: unknown[] = [];
+    const add = (clause: string, value: unknown) => { params.push(value); where.push(clause.replace('$?', '$' + params.length)); };
+    if (qy.work_order_id) add('work_order_id=$?', qy.work_order_id);
+    if (qy.task_id) add('task_id=$?', qy.task_id);
+    if (qy.operator_id) add('operator_id=$?', qy.operator_id);
+    if (qy.quality_status) add('quality_status=$?', qy.quality_status);
+    if (qy.settlement_status) add('settlement_status=$?', qy.settlement_status);
+    if (qy.report_type === 'rework') add('report_type=$?', 'rework');
+    else if (qy.report_type === 'odd') where.push('FALSE');
+    else if (qy.report_type === 'production') where.push("(report_type='production' OR report_type IS NULL)");
+    if (!a.permissions.includes('payroll.read')) add('operator_id=$?', a.user_id);
+    const filter = where.join(' AND ');
+    const emptyType = qy.report_type === 'odd';
+    const paged = qy.page !== undefined;
+    const page = Number(qy.page ?? '1');
+    const pageSize = paged ? Math.min(Number(qy.page_size ?? '30'), 200) : 200;
+    const total = emptyType ? 0 : Number((await sql.query<{ n: string }>(`SELECT count(*)::text AS n FROM production_reports WHERE ${filter}`, params)).rows[0]!.n);
+    const ids = emptyType ? [] : (await sql.query<{ id: string }>(`SELECT id FROM production_reports WHERE ${filter} ORDER BY created_at DESC LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`, params)).rows;
+    const summaryRow = emptyType ? { wage: '0', qty: '0', defect: '0', seconds: '0' } : (await sql.query<{ wage: string; qty: string; defect: string; seconds: string }>(`SELECT coalesce(sum((wage_snapshot->>'amount_cents')::numeric) FILTER (WHERE approval='approved' AND wage_snapshot->>'status'='priced'),0)::text AS wage, coalesce(sum(good_qty+defect_qty) FILTER (WHERE approval='approved'),0)::text AS qty, coalesce(sum(defect_qty) FILTER (WHERE approval='approved'),0)::text AS defect, coalesce(sum(effective_seconds) FILTER (WHERE approval='approved'),0)::text AS seconds FROM production_reports WHERE ${filter}`, params)).rows[0]!;
+    const countBase = a.permissions.includes('payroll.read') ? 'TRUE' : 'operator_id=$1';
+    const countParams = a.permissions.includes('payroll.read') ? [] : [a.user_id];
+    const counts = (await sql.query<{ production: string; pending: string; done: string; none: string; settled: string; unsettled: string }>(`SELECT count(*) FILTER (WHERE approval<>'reversed')::text AS production, count(*) FILTER (WHERE quality_status='pending' AND approval<>'reversed')::text AS pending, count(*) FILTER (WHERE quality_status='done' AND approval<>'reversed')::text AS done, count(*) FILTER (WHERE quality_status='none' AND approval<>'reversed')::text AS none, count(*) FILTER (WHERE settlement_status='settled' AND approval='approved')::text AS settled, count(*) FILTER (WHERE settlement_status='unsettled' AND approval='approved')::text AS unsettled FROM production_reports WHERE ${countBase}`, countParams)).rows[0]!;
+    return { items: await Promise.all(ids.map(async (row) => (await reportView(sql, row.id, a)).report)), total, page, page_size: pageSize, counts: { all: Number(counts.production), production: Number(counts.production), odd: 0, rework: 0, quality_pending: Number(counts.pending), quality_done: Number(counts.done), quality_none: Number(counts.none), settled: Number(counts.settled), unsettled: Number(counts.unsettled) }, summary: { wage_cents: summaryRow.wage, wage_amount: cashMoney(BigInt(summaryRow.wage.split('.')[0] ?? '0')), report_qty: summaryRow.qty, defect_qty: summaryRow.defect, effective_seconds: Number(summaryRow.seconds) } };
   }));
-  app.post<{ Body: { request_key: string; task_id: string; operator_id?: string; good_qty: string; defect_qty: string; rework_qty: string; scrap_qty: string; defect_note?: string; note?: string; effective_seconds?: number; supplement_id?:string; supplement?: boolean } }>('/api/production-reports', { preHandler: guard, schema: { body: object(['request_key', 'task_id', 'good_qty', 'defect_qty', 'rework_qty', 'scrap_qty'], { request_key: requestKey, task_id: uuid, operator_id: uuid, good_qty: decimalField, defect_qty: decimalField, rework_qty: decimalField, scrap_qty: decimalField, defect_note: { type: 'string', maxLength: 500 }, note, effective_seconds: {type:'integer',minimum:0,maximum:2678400}, supplement_id:uuid, supplement: { type: 'boolean' } }, ['operator_id', 'defect_note', 'note', 'effective_seconds', 'supplement_id', 'supplement']) } }, async (request, reply) => {
+  app.post<{ Body: { request_key: string; task_id: string; operator_id?: string; good_qty: string; defect_qty: string; rework_qty: string; scrap_qty: string; defect_note?: string; note?: string; effective_seconds?: number; supplement_id?:string; supplement?: boolean; started_at?: string | null; ended_at?: string | null; complete_task?: boolean; machine_id?: string } }>('/api/production-reports', { preHandler: guard, schema: { body: object(['request_key', 'task_id', 'good_qty', 'defect_qty', 'rework_qty', 'scrap_qty'], { request_key: requestKey, task_id: uuid, operator_id: uuid, good_qty: decimalField, defect_qty: decimalField, rework_qty: decimalField, scrap_qty: decimalField, defect_note: { type: 'string', maxLength: 500 }, note, effective_seconds: {type:'integer',minimum:0,maximum:2678400}, supplement_id:uuid, supplement: { type: 'boolean' }, started_at: { anyOf: [{ type: 'string', maxLength: 40 }, { type: 'null' }] }, ended_at: { anyOf: [{ type: 'string', maxLength: 40 }, { type: 'null' }] }, complete_task: { type: 'boolean' }, machine_id: uuid }, ['operator_id', 'defect_note', 'note', 'effective_seconds', 'supplement_id', 'supplement', 'started_at', 'ended_at', 'complete_task', 'machine_id']) } }, async (request, reply) => {
     const good = decimal(request.body.good_qty), defect = decimal(request.body.defect_qty), rework = decimal(request.body.rework_qty), scrap = decimal(request.body.scrap_qty);
     if (good + defect <= 0n && !(request.body.effective_seconds??0)) throw new Problem(422, 'EMPTY_REPORT', '良品与不良合计必须大于零，允许良品为零');
     if (rework + scrap > defect) throw new Problem(422, 'DISPOSITION_EXCEEDS_DEFECT', '返工与报废不能超过不良数量，差额保留为待处置');
-    if (defect > 0n && !(request.body.defect_note ?? '').trim()) throw new Problem(422, 'DEFECT_NOTE_REQUIRED', '不良数量大于零时必须填写不良说明');
-    const hash = digest({ ...request.body, operator_id: request.body.operator_id ?? null, defect_note: request.body.defect_note ?? '', note: request.body.note ?? '', supplement: request.body.supplement ?? false });
+    const hash = digest({ ...request.body, operator_id: request.body.operator_id ?? null, defect_note: request.body.defect_note ?? '', note: request.body.note ?? '', supplement: request.body.supplement ?? false, started_at: request.body.started_at ?? null, ended_at: request.body.ended_at ?? null, complete_task: request.body.complete_task ?? false });
     const created = await run(request, async (sql, a) => {
       permit(a, 'production.report');
       if (request.body.supplement && !a.permissions.includes('production.approve')) throw new Problem(403, 'SUPPLEMENT_FORBIDDEN', '超过任务计划的补产需要生产审核权限');
       const replay = await beginCommand(sql, 'report.create', request.body.request_key, hash);
       if (replay) return { replayed: true, ...(await reportView(sql, replay,a)) };
-      const task = (await sql.query<TaskRow>('SELECT t.id,t.work_order_id,t.sequence,t.route_step_id,t.process_id,t.process_snapshot,t.unit_ratio::text,t.plan_qty::text,t.is_output,t.execution,t.pause_source,t.previous_execution,t.approved_good::text,t.approved_defect::text,t.approved_rework::text,t.approved_scrap::text,t.version FROM work_order_tasks t WHERE t.id=$1 FOR UPDATE', [request.body.task_id])).rows[0];
+      const task = (await sql.query<TaskRow>(`SELECT ${taskColumns} FROM work_order_tasks WHERE id=$1 FOR UPDATE`, [request.body.task_id])).rows[0];
       if (!task) throw new Problem(404, 'TASK_NOT_FOUND', '生产任务不存在');
       const order = await lockWorkOrder(sql, task.work_order_id);
-      if (order.execution !== 'running' || task.execution !== 'running') throw new Problem(409, 'STATE_TRANSITION', '只有执行中的任务可以报工');
+      if (order.execution === 'not_started') throw new Problem(409, 'STATE_TRANSITION', '加工单未开始，不能报工');
+      if (order.execution === 'completed') throw new Problem(409, 'STATE_TRANSITION', '加工单已完成，不能报工');
+      if (order.execution === 'cancelled') throw new Problem(409, 'STATE_TRANSITION', '加工单已取消，不能报工');
+      if (order.order_paused) throw new Problem(409, 'STATE_TRANSITION', '加工单已暂停，不能报工');
+      if (task.execution === 'paused') throw new Problem(409, 'STATE_TRANSITION', '任务已暂停，不能报工');
+      if (task.execution === 'completed') throw new Problem(409, 'STATE_TRANSITION', '任务已完成，不能报工');
+      if (task.execution === 'not_started') await sql.query("UPDATE work_order_tasks SET execution='running',started_at=coalesce(started_at,now()),version=version+1 WHERE id=$1", [task.id]);
       const operatorId = request.body.operator_id ?? a.user_id;
       await assertOperator(sql, a, task.process_id, operatorId);
-      const used = q((await sql.query<{ n: string }>("SELECT coalesce(sum(good_qty+defect_qty),0)::text AS n FROM production_reports WHERE task_id=$1 AND approval IN ('pending','approved')", [task.id])).rows[0]!.n);
-      const usedGood = q((await sql.query<{ n: string }>("SELECT coalesce(sum(good_qty),0)::text AS n FROM production_reports WHERE task_id=$1 AND approval IN ('pending','approved')", [task.id])).rows[0]!.n);
-      const repaired=q((await sql.query<{n:string}>("SELECT coalesce(sum(good_qty),0)::text AS n FROM rework_reports WHERE task_id=$1 AND approval IN ('pending','approved')",[task.id])).rows[0]!.n);
-      let extra=0n;
+      if (request.body.machine_id && !(await sql.query('SELECT id FROM r8_machines WHERE id=$1 AND enabled', [request.body.machine_id])).rows[0]) throw new Problem(422, 'MACHINE', '机台不存在或已停用');
       if(request.body.supplement_id){
         const source=(await sql.query<{quantity:string}>("SELECT quantity::text FROM production_supplements WHERE id=$1 AND task_id=$2 AND approval='approved'",[request.body.supplement_id,task.id])).rows[0];
         if(!source)throw new Problem(422,'SUPPLEMENT_SOURCE_REQUIRED','补产报工必须引用本任务已审批并领料的追加投入');
         const allocated=q((await sql.query<{n:string}>("SELECT coalesce(sum(good_qty+defect_qty),0)::text AS n FROM production_reports WHERE supplement_id=$1 AND approval IN ('pending','approved')",[request.body.supplement_id])).rows[0]!.n);
-        if(allocated+good+defect>q(source.quantity))throw new Problem(422,'OVER_SUPPLEMENT','追加投入来源已经被报工占用');extra=q(source.quantity);
+        if(allocated+good+defect>q(source.quantity))throw new Problem(422,'OVER_SUPPLEMENT','追加投入来源已经被报工占用');
       }
-      const authorized=q((await sql.query<{n:string}>("SELECT coalesce(sum(quantity),0)::text AS n FROM production_supplements WHERE task_id=$1 AND approval='approved'",[task.id])).rows[0]!.n);
-      const previous=(await tasksOf(sql,order.id)).filter(t=>t.sequence<task.sequence).at(-1);
-      const inputCap=previous?mulCeil(divFloor(q(previous.approved_good),q(previous.unit_ratio)),q(task.unit_ratio)):q(task.plan_qty);
-      if (usedGood + repaired + good > q(task.plan_qty)) throw new Problem(422, 'OVER_PLAN', '净合格数量不能超过冻结任务计划，补产标记不能扩大成品上限');
-      if(good+defect>0n&&used+good+defect>inputCap+(request.body.supplement_id?authorized:0n))throw new Problem(422,request.body.supplement?'SUPPLEMENT_SOURCE_REQUIRED':'OVER_PLAN','投入不能超过前道净合格来源或首道计划；额外投入必须引用审批领料来源');
-      if (used + good + defect > q(task.plan_qty)+(request.body.supplement_id?authorized:0n)) throw new Problem(422, request.body.supplement ? 'SUPPLEMENT_SOURCE_REQUIRED' : 'OVER_PLAN', request.body.supplement ? '追加投入须有审批数量与追加领料来源；不能仅凭补产标记扩大投入' : '默认不允许总投入超过冻结任务计划');
-      const id = (await sql.query<{ id: string }>('INSERT INTO production_reports(tenant_id,code,work_order_id,task_id,process_id,reporter_id,operator_id,good_qty,defect_qty,rework_qty,scrap_qty,defect_note,note,supplement,effective_seconds) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id', [a.tenant_id, await nextCode(sql, a.tenant_id, 'RP', 'RP'), order.id, task.id, task.process_id, a.user_id, operatorId, formatDecimal(good), formatDecimal(defect), formatDecimal(rework), formatDecimal(scrap), (request.body.defect_note ?? '').trim(), request.body.note ?? '', request.body.supplement ?? false,request.body.effective_seconds??0])).rows[0]!.id;
-      const wage=await freezeWage(sql,order.product_id,task.process_id,formatDecimal(good),request.body.effective_seconds??0,(await sql.query<{wage_rule_version_id:string|null}>('SELECT wage_rule_version_id FROM work_order_tasks WHERE id=$1',[task.id])).rows[0]!.wage_rule_version_id);
-      wage.worker_id=operatorId;wage.worker_name=(await sql.query<{display_name:string}>('SELECT display_name FROM tenant_team_members WHERE id=$1',[operatorId])).rows[0]!.display_name;
-      if(good+defect===0n&&wage.mode!=='time')throw new Problem(422,'TIME_RULE_REQUIRED','零数量报工必须引用有效计时工价');
+      const id = (await sql.query<{ id: string }>('INSERT INTO production_reports(tenant_id,code,work_order_id,task_id,process_id,reporter_id,operator_id,good_qty,defect_qty,rework_qty,scrap_qty,defect_note,note,supplement,effective_seconds,approval,machine_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,\'approved\',$16) RETURNING id', [a.tenant_id, await nextCode(sql, a.tenant_id, 'RP', 'RP'), order.id, task.id, task.process_id, a.user_id, operatorId, formatDecimal(good), formatDecimal(defect), formatDecimal(rework), formatDecimal(scrap), (request.body.defect_note ?? '').trim(), request.body.note ?? '', request.body.supplement ?? false,request.body.effective_seconds??0, request.body.machine_id ?? null])).rows[0]!.id;
+      const snap = task.process_snapshot as Record<string, unknown>;
+      const productSnap = order.product_snapshot as Record<string, unknown>;
+      const operatorName = (await sql.query<{display_name:string}>('SELECT display_name FROM tenant_team_members WHERE id=$1',[operatorId])).rows[0]!.display_name;
+      const perf = await matchPerformance(sql, {
+        processName: String(snap.name ?? snap.process_name ?? ''),
+        pricingMode: task.pricing_mode === 'time' ? '计时' : '计件',
+        productName: String(productSnap.name ?? ''),
+        productCode: String(productSnap.code ?? ''),
+        productSpec: String(productSnap.specification ?? ''),
+        userName: operatorName,
+      });
+      const taskPrice = perf
+        ? { mode: task.pricing_mode, rate: perf.wage_rate }
+        : (task.wage_rate === null || task.wage_rate === undefined ? null : { mode: task.pricing_mode, rate: task.wage_rate });
+      const wage=await freezeWage(sql,order.product_id,task.process_id,formatDecimal(good),request.body.effective_seconds??0,task.wage_rule_version_id,taskPrice);
+      if (perf) applyPerformance(wage as Record<string, unknown>, perf, {
+        good: formatDecimal(good), defect: formatDecimal(defect), total: formatDecimal(good + defect),
+        seconds: request.body.effective_seconds ?? 0, pricingMode: task.pricing_mode,
+      });
+      wage.worker_id=operatorId;wage.worker_name=operatorName;
+      if(good+defect===0n&&wage.mode!=='time')throw new Problem(422,'TIME_RULE_REQUIRED','良品和不良品都为0时，只能按计时方式报工');
       if(wage.mode==='time'&&!(request.body.effective_seconds??0))throw new Problem(422,'TIME_REQUIRED','计时规则必须填写有效工时');
-      await sql.query('UPDATE production_reports SET wage_snapshot=$1,wage_status=$2,effective_seconds=$3,supplement_id=$4 WHERE id=$5',[wage,wage.status,request.body.effective_seconds??0,request.body.supplement_id??null,id]);
+      const quality = task.inspection_scheme === 'full' || task.inspection_scheme === 'sample' ? 'pending' : 'none';
+      await sql.query("UPDATE production_reports SET wage_snapshot=$1,wage_status=$2,effective_seconds=$3,supplement_id=$4,quality_status=$5,started_at=$6,ended_at=$7 WHERE id=$8",[wage,wage.status,request.body.effective_seconds??0,request.body.supplement_id??null,quality,shanghaiDateTime(request.body.started_at),shanghaiDateTime(request.body.ended_at),id]);
+      await postWage(sql,a,id);
+      await refreshTaskQuantities(sql, task.id);
+      await runAutoStock(sql, a, { reportId: id, taskId: task.id, workOrderId: order.id });
+      if (request.body.complete_task) {
+        await sql.query("UPDATE work_order_tasks SET execution='completed',completion_source='manual',completed_at=coalesce(completed_at,now()),version=version+1 WHERE id=$1 AND execution<>'completed'", [task.id]);
+        await syncExecution(sql, order.id);
+      }
       await finishCommand(sql, a.tenant_id, 'report.create', request.body.request_key, hash, 'production_report', id);
       const body = await reportView(sql, id,a);
       await writeAudit(sql, a, 'report.submitted', 'production_report', id, null, body.report);
@@ -551,6 +744,10 @@ export function registerProduction(app: FastifyInstance, services: Services) {
     const report = (await sql.query<{ id: string; work_order_id: string; task_id: string; approval: string; version: number; good_qty: string }>('SELECT id,work_order_id,task_id,approval,version,good_qty::text FROM production_reports WHERE id=$1 FOR UPDATE', [request.params.id])).rows[0];
     if (!report) throw new Problem(404, 'REPORT_NOT_FOUND', '报工不存在');
     if (report.version !== request.body.version) throw new Problem(409, 'VERSION_CONFLICT', '报工已被修改，请刷新');
+    if (action === 'approve' && report.approval === 'approved') {
+      if (request.body.request_key) await finishCommand(sql, a.tenant_id, `report.${action}`, request.body.request_key, hash, 'production_report', report.id);
+      return { replayed: false, ...(await reportView(sql, report.id, a)) };
+    }
     const order = await lockWorkOrder(sql, report.work_order_id);
     if (['completed', 'cancelled'].includes(order.execution)) throw new Problem(409, 'DOWNSTREAM_EXISTS', '加工单已完工或取消，不能再改报工');
     if (action === 'approve') {
@@ -570,7 +767,6 @@ export function registerProduction(app: FastifyInstance, services: Services) {
       await sql.query("UPDATE production_reports SET approval='rejected',reject_reason=$2,version=version+1,updated_at=now() WHERE id=$1", [report.id, needReason(request.body.reason, '驳回必须填写原因')]);
     } else {
       if (report.approval !== 'approved') throw new Problem(409, 'STATE_TRANSITION', '只有已审核报工可以冲销');
-      needReason(request.body.reason, '冲销报工必须填写原因');
       const task = (await tasksOf(sql, order.id)).find((item) => item.id === report.task_id)!;
       if (task.is_output && (await sql.query("SELECT id FROM inspections WHERE work_order_id=$1 AND state IN ('pending','completed') LIMIT 1", [order.id])).rows[0]) throw new Problem(409, 'DOWNSTREAM_EXISTS', '成品检验已经引用产出，须先处理检验来源');
       if ((await sql.query("SELECT r.id FROM production_reports r JOIN work_order_tasks t ON t.tenant_id=r.tenant_id AND t.id=r.task_id WHERE t.work_order_id=$1 AND t.sequence>$2 AND r.approval IN ('pending','approved') LIMIT 1", [order.id, task.sequence])).rows[0]) throw new Problem(409, 'DOWNSTREAM_EXISTS', '后续工序已有报工，须先处理下游');
@@ -907,5 +1103,99 @@ export function registerProduction(app: FastifyInstance, services: Services) {
     if(snapshot?.status==='priced'){const amount=snapshot.mode==='piece'?lineCents(good,snapshot.rate!):roundMoney(BigInt(seconds)*priceRate(snapshot.rate!),360_000_000n);snapshot={...snapshot,good_qty:formatDecimal(good),effective_seconds:seconds,amount_cents:amount.toString(),amount:cashMoney(amount)};if(snapshot.mode==='time'&&seconds===0)throw new Problem(422,'TIME_REQUIRED','计时工时须大于零');}
     await sql.query("UPDATE production_reports SET good_qty=$1,defect_qty=$2,rework_qty=$3,scrap_qty=$4,defect_note=$5,effective_seconds=$6,wage_snapshot=$7,approval='pending',reject_reason='',version=version+1,updated_at=now() WHERE id=$8",[b.good_qty,b.defect_qty,b.rework_qty,b.scrap_qty,b.defect_note??'',seconds,snapshot,old.id]);
     await finishCommand(sql,a.tenant_id,'report.resubmit',b.request_key,hash,'production_report',old.id);const result=await reportView(sql,old.id,a);await writeAudit(sql,a,'report.resubmitted','production_report',old.id,{approval:old.approval,version:old.version},{...result.report,reason:b.reason});return {replayed:false,...result};
+  }));
+
+  app.delete<{ Params: { id: string }; Body: { version: number } }>('/api/work-orders/:id', { preHandler: guard, schema: { params: idParams, body: object(['version'], { version: versionField }) } }, (request) => run(request, async (sql, a) => {
+    permit(a, 'production.write');
+    const order = await lockWorkOrder(sql, request.params.id, request.body.version);
+    if (order.execution !== 'not_started') throw new Problem(409, 'STATE_TRANSITION', '只有未开始的加工单可以删除');
+    const blocked = (await sql.query("SELECT id FROM production_reports WHERE work_order_id=$1 UNION ALL SELECT id FROM material_issues WHERE work_order_id=$1 UNION ALL SELECT id FROM fg_receipts WHERE work_order_id=$1 LIMIT 1", [order.id])).rows[0];
+    if (blocked) throw new Problem(409, 'DOWNSTREAM_EXISTS', '已有报工、领料或入库记录，不能删除');
+    if ((await sql.query('SELECT 1 FROM work_orders WHERE parent_id=$1 LIMIT 1', [order.id])).rows[0]) throw new Problem(409, 'CHILD_EXISTS', '存在子加工单，不能删除');
+    await sql.query('DELETE FROM work_order_materials WHERE work_order_id=$1', [order.id]);
+    await sql.query('DELETE FROM work_order_tasks WHERE work_order_id=$1', [order.id]);
+    await sql.query('DELETE FROM work_orders WHERE id=$1', [order.id]);
+    if (order.sales_line_id) await recomputeScheduled(sql, order.sales_line_id);
+    await writeAudit(sql, a, 'work_order.deleted', 'work_order', order.id, { code: order.code }, null);
+    return { ok: true };
+  }));
+
+  app.post<{ Params: { id: string }; Body: { qty?: string; quantities?: string[]; version: number } }>('/api/work-orders/:id/split', { preHandler: guard, schema: { params: idParams, body: object(['version'], { qty: decimalField, quantities: { type: 'array', minItems: 2, maxItems: 50, items: decimalField }, version: versionField }, ['qty', 'quantities']) } }, (request) => run(request, async (sql, a) => {
+    permit(a, 'production.write');
+    const order = await lockWorkOrder(sql, request.params.id, request.body.version);
+    if (order.execution !== 'not_started') throw new Problem(409, 'STATE_TRANSITION', '只有未开始的加工单可以拆单');
+    const reported = (await sql.query('SELECT id FROM production_reports WHERE work_order_id=$1 LIMIT 1', [order.id])).rows[0];
+    if (reported) throw new Problem(409, 'HAS_REPORTS', '已有报工的加工单不能拆单');
+    const plan = q(order.plan_qty);
+    if (request.body.quantities?.length) {
+      const parts = request.body.quantities.map((item) => decimal(item, { positive: true }));
+      const sum = parts.reduce((acc, value) => acc + value, 0n);
+      if (sum !== plan) throw new Problem(422, 'SPLIT_QTY', '拆分数量合计必须等于原计划数');
+      const codes: string[] = [];
+      const first = parts[0]!;
+      await sql.query('UPDATE work_orders SET plan_qty=$1,version=version+1,updated_at=now() WHERE id=$2', [formatDecimal(first), order.id]);
+      const tasks = await tasksOf(sql, order.id);
+      for (const task of tasks) {
+        const ratio = q(task.unit_ratio);
+        await sql.query('UPDATE work_order_tasks SET plan_qty=$1,version=version+1 WHERE id=$2', [formatDecimal(mulCeil(first, ratio)), task.id]);
+      }
+      const mats = (await sql.query<{ id: string; required_qty: string }>('SELECT id,required_qty::text FROM work_order_materials WHERE work_order_id=$1', [order.id])).rows;
+      for (const mat of mats) {
+        const req = q(mat.required_qty);
+        await sql.query('UPDATE work_order_materials SET required_qty=$1 WHERE id=$2', [formatDecimal(divFloor(req * first, plan)), mat.id]);
+      }
+      for (let index = 1; index < parts.length; index += 1) {
+        const qty = parts[index]!;
+        const childCode = `${order.code}-${index}`;
+        const childId = (await sql.query<{ id: string }>('INSERT INTO work_orders(tenant_id,code,product_id,unit_id,plan_qty,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,created_by,priority,due_date,planned_start,planned_end,note,production_plan_line_id,project_id,parent_id) SELECT tenant_id,$2,product_id,unit_id,$3,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,$4,priority,due_date,planned_start,planned_end,note,production_plan_line_id,project_id,parent_id FROM work_orders WHERE id=$1 RETURNING id', [order.id, childCode, formatDecimal(qty), a.user_id])).rows[0]!.id;
+        for (const task of tasks) {
+          await sql.query('INSERT INTO work_order_tasks(tenant_id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio,plan_qty,is_output,pricing_mode,wage_rate,inspection_scheme,report_component_id,qc_component_id,task_kind) SELECT tenant_id,$1,sequence,route_step_id,process_id,process_snapshot,unit_ratio,$2,is_output,pricing_mode,wage_rate,inspection_scheme,report_component_id,qc_component_id,task_kind FROM work_order_tasks WHERE id=$3', [childId, formatDecimal(mulCeil(qty, q(task.unit_ratio))), task.id]);
+        }
+        for (const mat of mats) {
+          await sql.query('INSERT INTO work_order_materials(tenant_id,work_order_id,product_id,unit_id,required_qty,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths) SELECT tenant_id,$1,product_id,unit_id,$2,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths FROM work_order_materials WHERE id=$3', [childId, formatDecimal(divFloor(q(mat.required_qty) * qty, plan)), mat.id]);
+        }
+        codes.push(childCode);
+      }
+      await sql.query('INSERT INTO work_order_splits(tenant_id,source_id,quantities,created_by) VALUES($1,$2,$3,$4)', [a.tenant_id, order.id, parts.map((value) => formatDecimal(value)), a.user_id]);
+      return { work_order: (await workOrderView(sql, order.id)).work_order, children: codes };
+    }
+    if (!request.body.qty) throw new Problem(422, 'SPLIT_QTY', '请填写拆出数量');
+    const splitQty = decimal(request.body.qty, { positive: true });
+    if (splitQty >= plan) throw new Problem(422, 'SPLIT_QTY', '拆出数量必须小于计划数量');
+    const childCode = await resolveWorkOrderCode(sql, a.tenant_id, undefined);
+    const childId = (await sql.query<{ id: string }>('INSERT INTO work_orders(tenant_id,code,product_id,unit_id,plan_qty,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,created_by,priority,due_date,planned_start,planned_end,note,production_plan_line_id,project_id,parent_id) SELECT tenant_id,$2,product_id,unit_id,$3,sales_order_id,sales_line_id,contract_id,contract_line_id,route_version_id,bom_version_id,warehouse_id,product_snapshot,route_name_snapshot,bom_revision,requires_fg_inspection,$4,priority,due_date,planned_start,planned_end,note,production_plan_line_id,project_id,$5 FROM work_orders WHERE id=$1 RETURNING id', [order.id, childCode, formatDecimal(splitQty), a.user_id, order.id])).rows[0]!.id;
+    const tasks = await tasksOf(sql, order.id);
+    for (const task of tasks) {
+      const ratio = q(task.unit_ratio);
+      const childPlan = mulCeil(splitQty, ratio);
+      const remainPlan = q(task.plan_qty) - childPlan;
+      await sql.query('INSERT INTO work_order_tasks(tenant_id,work_order_id,sequence,route_step_id,process_id,process_snapshot,unit_ratio,plan_qty,is_output,pricing_mode,wage_rate,inspection_scheme,report_component_id,qc_component_id,task_kind) SELECT tenant_id,$1,sequence,route_step_id,process_id,process_snapshot,unit_ratio,$2,is_output,pricing_mode,wage_rate,inspection_scheme,report_component_id,qc_component_id,task_kind FROM work_order_tasks WHERE id=$3', [childId, formatDecimal(childPlan), task.id]);
+      await sql.query('UPDATE work_order_tasks SET plan_qty=$1,version=version+1 WHERE id=$2', [formatDecimal(remainPlan), task.id]);
+    }
+    const mats = (await sql.query<{ id: string; required_qty: string }>('SELECT id,required_qty::text FROM work_order_materials WHERE work_order_id=$1', [order.id])).rows;
+    for (const mat of mats) {
+      const req = q(mat.required_qty);
+      const childReq = divFloor(req * splitQty, plan);
+      const remainReq = req - childReq;
+      await sql.query('INSERT INTO work_order_materials(tenant_id,work_order_id,product_id,unit_id,required_qty,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths) SELECT tenant_id,$1,product_id,unit_id,$2,feeding_process_id,feeding_task_id,feeding_ambiguous,component_snapshot,source_paths FROM work_order_materials WHERE id=$3', [childId, formatDecimal(childReq), mat.id]);
+      await sql.query('UPDATE work_order_materials SET required_qty=$1 WHERE id=$2', [formatDecimal(remainReq), mat.id]);
+    }
+    await sql.query('UPDATE work_orders SET plan_qty=$1,version=version+1,updated_at=now() WHERE id=$2', [formatDecimal(plan - splitQty), order.id]);
+    return { work_order: (await workOrderView(sql, order.id)).work_order, child: (await workOrderView(sql, childId)).work_order };
+  }));
+
+  app.put<{ Params: { id: string }; Body: { items: { sequence: number; planned_start?: string | null; planned_end?: string | null; dispatch_operator_ids?: string[] }[] } }>('/api/work-orders/:id/task-plans', { preHandler: guard, schema: { params: idParams, body: object(['items'], { items: { type: 'array', maxItems: 100, items: object(['sequence'], { sequence: { type: 'integer', minimum: 1 }, planned_start: nullableDate, planned_end: nullableDate, dispatch_operator_ids: { type: 'array', maxItems: 50, items: uuid } }, ['planned_start', 'planned_end', 'dispatch_operator_ids']) } }) } }, (request) => run(request, async (sql, a) => {
+    permit(a, 'production.write');
+    await lockWorkOrder(sql, request.params.id);
+    for (const item of request.body.items) {
+      calendarDate(item.planned_start); calendarDate(item.planned_end);
+      const ids = item.dispatch_operator_ids ?? [];
+      if (ids.length) {
+        const rows = (await sql.query<{ id: string }>('SELECT id FROM tenant_team_members WHERE id=ANY($1::uuid[])', [ids])).rows;
+        if (rows.length !== ids.length) throw new Problem(422, 'INVALID_REPORTER', '生产派工人员必须全部为本企业启用成员');
+      }
+      await sql.query('UPDATE work_order_tasks SET planned_start=$1,planned_end=$2,dispatch_operator_ids=$3,version=version+1 WHERE work_order_id=$4 AND sequence=$5', [item.planned_start ?? null, item.planned_end ?? null, ids, request.params.id, item.sequence]);
+    }
+    return workOrderView(sql, request.params.id);
   }));
 }
