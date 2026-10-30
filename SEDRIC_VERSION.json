@@ -1,19 +1,24 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.74",
-  "display": "SEDRIC01 v1.0.74",
-  "feature": "plan-detail-left-card",
-  "hotfix": "20261027-plan-detail-v174",
+  "version": "1.0.84",
+  "display": "SEDRIC01 v1.0.84",
+  "feature": "mobile-bill-flat-p41",
+  "hotfix": "20261029-mobile-bill-flat-v184",
   "primary": "#4184F4",
-  "released_at": "2026-10-27T10:35:15+08:00",
+  "released_at": "2026-10-29T18:43:57+08:00",
   "features": [
-    "生产计划详情：恢复原版左侧竖卡信息区（计划编号/物料分析状态/加工·外协·采购进度/交货日期/备注/创建人/创建时间）",
-    "进度条轨道补足宽高，彩色填充与百分比可见；右侧页签与算料逻辑未改"
+    "P4.1：采购单据编辑 ≤768 去 Form 白卡套层，内容贴 Modal 单层白底",
+    "LineTable 窄屏行卡补齐：商品图片占位、类别 tag、行备注（可折）",
+    "ProductPicker 窄屏搜索/开关直铺 sheet，勿再套白卡",
+    "PC≥769 宽表/弹层原样",
+    "仅前端 shared.tsx + kgd.css；API/写库/密码未动；不开云端 Cursor"
   ],
-  "note": "热修：productionPlans + ProgressCell + progress.css；承 v1.0.73 mrp-scale-fix；未重建库、未改密码；前端 rebuild；进度轨道色 #e8e8e8 保证 0% 可见",
-  "dist_js": "index-BxsRLap0.js",
-  "vps_backup": ".bak-20261027-plan-detail-v174",
-  "prev": "1.0.73 mrp-scale-fix",
-  "tag": "plan-detail-left-card",
-  "dist_css": "index-CqEvOEpH.css"
+  "note": "热修：shared.tsx + kgd.css；未重建库、未改 .env/密码、未动 api",
+  "prev": "1.0.83 mobile-bill-pick-cards",
+  "tag": "mobile-bill-flat-p41",
+  "dist_js": "index-CriJyBQ0.js",
+  "dist_css": "index-Cw_vdb1_.css",
+  "dist_js_sha256": "75f85a485109b0eb65bcbced5df2a1cbb2d0e291323998ba4dc6625ad0ff60b6",
+  "dist_css_sha256": "6afc090c4340a885bfd0290e0f4a6994b96b5c68dc9f372330c3fe4c668af4e2",
+  "vps_backup": ".bak-20261029-mobile-bill-flat-v184"
 }

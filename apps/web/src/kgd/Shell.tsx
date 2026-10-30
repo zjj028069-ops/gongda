@@ -199,6 +199,9 @@ export function Shell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  /** ≤768：侧栏改抽屉，与桌面 collapsed(64px 轨)解耦；≥769 不读此状态 */
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [primary, setPrimary] = useState('produce');
   /** 一级内联展开（与选中高亮解耦，便于 ▾ 单独收起） */
   const [expandedPrimary, setExpandedPrimary] = useState<string | null>(null);
@@ -239,6 +242,22 @@ export function Shell() {
   useEffect(() => {
     applyStoredAppearance();
   }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const apply = () => {
+      const narrow = mq.matches;
+      setIsNarrow(narrow);
+      if (!narrow) setMobileNavOpen(false);
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+  /** 窄屏进页后自动收起抽屉（含一级/叶子导航） */
+  useEffect(() => {
+    if (isNarrow) setMobileNavOpen(false);
+  }, [location.pathname, isNarrow]);
   useEffect(() => {
     const onFs = () => setWpFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', onFs);
@@ -326,7 +345,8 @@ export function Shell() {
     manualCollapsedPrimary.current = null;
     setPrimary(item.key);
     setExpandedPrimary(item.key);
-    setCollapsed(false);
+    if (!isNarrow) setCollapsed(false);
+    else setMobileNavOpen(true);
     if (item.path) navigate(item.path);
     else {
       const first = firstVisiblePath(kids, session);
@@ -348,11 +368,20 @@ export function Shell() {
   const specTail = specForPath(location.pathname)?.breadcrumb_tail;
   const tail = specTail ?? crumbTail(location.pathname, current?.primary.key);
   if (tail && crumb[crumb.length - 1] !== tail) crumb.push(tail);
-  return <div className="kgd-app">
-    <aside className={`kgd-sidebar ${collapsed ? 'is-collapsed' : ''}`} aria-label="主导航">
+  const desktopCollapsed = !isNarrow && collapsed;
+  const showSidebarText = isNarrow || !collapsed;
+  return <div className={`kgd-app${isNarrow ? ' is-narrow' : ''}${isNarrow && mobileNavOpen ? ' is-mobile-nav-open' : ''}`}>
+    {isNarrow && mobileNavOpen && (
+      <button type="button" className="kgd-mobile-scrim" aria-label="关闭菜单" onClick={() => setMobileNavOpen(false)} />
+    )}
+    <aside
+      className={`kgd-sidebar${desktopCollapsed ? ' is-collapsed' : ''}${isNarrow ? ' is-mobile' : ''}${isNarrow && mobileNavOpen ? ' is-mobile-open' : ''}`}
+      aria-label="主导航"
+      aria-hidden={isNarrow && !mobileNavOpen ? true : undefined}
+    >
       <div className="kgd-sidebar-brand" title={brand}>
         {logo ? <img src={logo} alt="" /> : <i>赛</i>}
-        {!collapsed && <span className="kgd-sidebar-brand-text">{brand}</span>}
+        {showSidebarText && <span className="kgd-sidebar-brand-text">{brand}</span>}
       </div>
       <nav className="kgd-sidebar-nav">
         {primaryMenus.map((item) => {
@@ -361,12 +390,12 @@ export function Shell() {
           const isActive = item.key === primary;
           const kids = filterSidebarMenus(childrenFor(item));
           const hasKids = kids.length > 0;
-          const isExpanded = !collapsed && expandedPrimary === item.key && hasKids;
+          const isExpanded = showSidebarText && expandedPrimary === item.key && hasKids;
           return <div key={item.key} className={`kgd-sidebar-primary-block ${isActive ? 'is-active' : ''} ${isExpanded ? 'is-expanded' : ''}`}>
             <button type="button" data-primary={item.key} className={`kgd-sidebar-primary ${isActive ? 'active' : ''}`} aria-label={item.label} aria-expanded={isExpanded} onClick={() => openPrimary(item)}>
               <PrimaryIcon name={item.icon} />
-              {!collapsed && <span className="kgd-sidebar-label">{item.label}</span>}
-              {!collapsed && hasKids && (
+              {showSidebarText && <span className="kgd-sidebar-label">{item.label}</span>}
+              {showSidebarText && hasKids && (
                 <span
                   className="kgd-sidebar-chevron"
                   role="button"
@@ -395,8 +424,19 @@ export function Shell() {
     <div className="kgd-main">
       <header className="kgd-top">
         <div className="kgd-top-left">
-          <button className="kgd-link" aria-label="折叠菜单" onClick={() => setCollapsed((value) => !value)}>{collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}</button>
-          <Breadcrumb items={crumb.map((item, index) => ({ title: index === 0 ? <Link to="/staging/area">主页</Link> : item }))} />
+          <button
+            className="kgd-link"
+            aria-label={isNarrow ? (mobileNavOpen ? '关闭菜单' : '打开菜单') : '折叠菜单'}
+            onClick={() => {
+              if (isNarrow) setMobileNavOpen((value) => !value);
+              else setCollapsed((value) => !value);
+            }}
+          >
+            {isNarrow
+              ? (mobileNavOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />)
+              : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)}
+          </button>
+          {!isNarrow && <Breadcrumb items={crumb.map((item, index) => ({ title: index === 0 ? <Link to="/staging/area">主页</Link> : item }))} />}
           {/\/(add|edit|detail)(\/|$)|\/edit$|_edit\/edit$|\/split\//.test(location.pathname) && <button className="kgd-link" onClick={() => navigate(-1)}>返回</button>}
         </div>
         <div className="kgd-top-right">
@@ -404,11 +444,28 @@ export function Shell() {
           <span hidden>0.5.0-dev.1</span>
           <AppearanceSwitcher />
           {isWorkplace && (
-            <>
-              <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('fullscreen')}>{wpFullscreen ? '退出全屏' : '全屏'}</button>
-              <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('refresh')}>刷新</button>
-              <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('configure')}>配置工作台</button>
-            </>
+            isNarrow ? (
+              <Dropdown
+                trigger={['click']}
+                placement="bottomRight"
+                overlayClassName="kgd-top-more-dropdown"
+                menu={{
+                  items: [
+                    { key: 'fullscreen', label: wpFullscreen ? '退出全屏' : '全屏', onClick: () => emitWorkplaceAction('fullscreen') },
+                    { key: 'refresh', label: '刷新', onClick: () => emitWorkplaceAction('refresh') },
+                    { key: 'configure', label: '配置工作台', onClick: () => emitWorkplaceAction('configure') },
+                  ],
+                }}
+              >
+                <button type="button" className="kgd-top-more" aria-label="更多">⋯</button>
+              </Dropdown>
+            ) : (
+              <>
+                <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('fullscreen')}>{wpFullscreen ? '退出全屏' : '全屏'}</button>
+                <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('refresh')}>刷新</button>
+                <button type="button" className="kgd-top-action" onClick={() => emitWorkplaceAction('configure')}>配置工作台</button>
+              </>
+            )
           )}
           <MessageBell />
           {!inChatShell && (

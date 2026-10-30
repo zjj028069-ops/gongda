@@ -298,3 +298,77 @@
   .wp-shortcut-group-title { padding-top: 0; }
   .wp-shortcut-group-items { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+
+/* ===== P1 mobile density ≤768 — 主区单列全宽堆叠；快捷入口卡内仍 3 列；≥769 不动 ===== */
+@media (max-width: 768px) {
+  .wp-canvas-shell {
+    padding: 10px 10px 14px;
+    border-radius: 16px;
+    min-height: 0;
+  }
+  /* 绝对定位双栏 → 文档流单列；不改业务 layout 存盘 */
+  .wp-board {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100%;
+  }
+  .wp-widget {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    max-width: 100%;
+  }
+  .wp-widget-body {
+    height: auto !important;
+    overflow: visible;
+  }
+  .wp-widget-body > .wp-card,
+  .wp-widget-body > .wp-banner {
+    height: auto !important;
+    min-height: 0;
+  }
+  .wp-widget-body > .wp-card {
+    overflow: visible;
+  }
+  /* 编辑态控件仍可用，但卡片已全宽 */
+  .wp-widget-drag,
+  .wp-widget-close,
+  .wp-widget-resize {
+    /* keep */
+  }
+  /* 快捷入口：卡全宽，格内仍 3 列 */
+  .wp-shortcuts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .wp-shortcuts button {
+    font-size: 12px;
+    white-space: normal;
+  }
+  .wp-banner {
+    grid-template-columns: 1fr;
+  }
+  .wp-brief-grid {
+    grid-template-columns: 1fr;
+  }
+  .wp-stock-pair {
+    grid-template-columns: 1fr;
+  }
+  .wp-todo-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .wp-todo-group > span {
+    max-width: none;
+  }
+  .wp-todo-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

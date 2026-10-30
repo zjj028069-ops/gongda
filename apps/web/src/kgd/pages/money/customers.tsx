@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Dropdown, Form, Input, Modal, Select } from 'antd';
 import { hasPoint } from '../../../api';
 import { useKgd } from '../../context';
@@ -16,6 +16,8 @@ import { requestKey } from '../../../requestKey';
 
 export function CustomerList() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const goDetail = (row: Rec) => { void navigate(`/customer/detail/${row.id}`); };
   const detailId = pathname.startsWith('/customer/detail/') ? pathname.split('/').pop() ?? '' : '';
   const { message } = App.useApp();
   const money = useMoney();
@@ -48,16 +50,23 @@ export function CustomerList() {
     return true;
   });
   async function act(path: string, body: Record<string, unknown>, method: 'POST' | 'PATCH' | 'DELETE' = 'POST') {
-    try { await money.send(path, body, method); message.success('已保存'); }
-    catch (error) { message.error(showError(error)); }
+    try { await money.send(path, body, method); message.success('已保存'); return true; }
+    catch (error) { message.error(showError(error)); return false; }
   }
   if (detailId) {
-    const customer = (detail.data as { customer?: Rec } | undefined)?.customer;
-    return <div className="kgd-card">{detail.error ? detail.error : customer ? <h1>{String(customer.name ?? '')}</h1> : '加载中'}</div>;
+    return <CustomerDetailPage
+      detailId={detailId}
+      detail={detail}
+      session={session}
+      settingsTags={settings.data?.tags ?? []}
+      open={open}
+      setOpen={setOpen}
+      act={act}
+    />;
   }
   const baseColumns = [
-    { key: 'code', title: '客户编号', render: (row: Rec) => row.code },
-    { key: 'name', title: '客户', render: (row: Rec) => <><button className="kgd-heart" onClick={() => act(`/api/money/customers/${row.id}/follow`, {})}>{row.followed ? '♥' : '♡'}</button><button className="kgd-link">{row.name}</button></> },
+    { key: 'code', title: '客户编号', render: (row: Rec) => <button type="button" className="kgd-link" onClick={(event) => { event.stopPropagation(); goDetail(row); }}>{row.code}</button> },
+    { key: 'name', title: '客户', render: (row: Rec) => <><button type="button" className="kgd-heart" onClick={(event) => { event.stopPropagation(); void act(`/api/money/customers/${row.id}/follow`, {}); }}>{row.followed ? '♥' : '♡'}</button><button type="button" className="kgd-link" onClick={(event) => { event.stopPropagation(); goDetail(row); }}>{row.name}</button></> },
     { key: 'tags', title: '客户标签', render: (row: Rec) => (row.tags ?? []).join('、') },
     { key: 'contact', title: '联系人', render: (row: Rec) => row.contact_name },
     { key: 'phone', title: '联系人电话', render: (row: Rec) => row.contact_phone },
@@ -80,7 +89,7 @@ export function CustomerList() {
   ];
   const customerCardFields = Object.fromEntries(['list', 'detail'].map((key) => [key, customerColumns.filter((column) => column.key !== 'actions').map((column) => ({ key: column.key, label: column.title }))]));
   return <>
-    <ListFrame pageKey="customer-list" showAdvancedSearch={false} rows={rows} loading={remote.loading} error={remote.error || money.error} queryFields={[
+    <ListFrame pageKey="customer-list" showAdvancedSearch={false} rows={rows} loading={remote.loading} error={remote.error || money.error} onRow={(row) => goDetail(row)} queryFields={[
       { key: 'code', label: '客户编号' }, { key: 'name', label: '客户' }, { key: 'tag', label: '客户标签' }, { key: 'contact', label: '联系人' }, { key: 'owner', label: '负责人' }, { key: 'address', label: '地址' }, { key: 'phone', label: '联系人电话' }, { key: 'active', label: '是否启用' }, { key: 'followed', label: '是否关注' },
     ]} queryValue={query.draft} onQuery={query.onQuery} onSearch={query.onSearch} onClear={query.onClear} page={query.page} pageSize={query.pageSize} total={rows.length} onPage={query.onPage}
       toolbar={<>
@@ -133,6 +142,131 @@ export function CustomerList() {
       message.success('已导入');
     } catch (error) { message.error(showError(error)); }
   }
+}
+
+type DetailTab = 'info' | 'contacts' | 'addresses';
+
+function CustomerDetailPage({
+  detailId, detail, session, settingsTags, open, setOpen, act,
+}: {
+  detailId: string;
+  detail: { data?: { customer?: Rec } | null; error?: string | null; loading?: boolean };
+  session: ReturnType<typeof useKgd>['session'];
+  settingsTags: Rec[];
+  open: Rec | true | null;
+  setOpen: (v: Rec | true | null) => void;
+  act: (path: string, body: Record<string, unknown>, method?: 'POST' | 'PATCH' | 'DELETE') => Promise<boolean>;
+}) {
+  const navigate = useNavigate();
+  const { message } = App.useApp();
+  const [tab, setTab] = useState<DetailTab>('info');
+  const customer = detail.data?.customer;
+  const contacts = (customer?.contacts as Rec[] | undefined) ?? [];
+  const addresses = (customer?.addresses as Rec[] | undefined) ?? [];
+
+  if (detail.error) {
+    return <div className="kgd-card kgd-cust-detail"><div className="kgd-banner">{detail.error}</div>
+      <button type="button" className="kgd-link" onClick={() => navigate('/customer/list')}>返回列表</button></div>;
+  }
+  if (!customer) {
+    return <div className="kgd-card kgd-cust-detail">加载中…</div>;
+  }
+
+  const tags = Array.isArray(customer.tags) ? (customer.tags as string[]) : [];
+  const active = customer.active !== false;
+  const followed = Boolean(customer.followed);
+  const addrLine = [customer.region, customer.address].filter(Boolean).join(' · ') || '—';
+  const moreItems = [
+    { key: 'sea', label: '放入公海', onClick: () => confirmText('放入公海', '确定将该客户放入公海？', () => void act(`/api/money/customers/${detailId}/sea`, {}).then((ok) => { if (ok) navigate('/customer/list'); })) },
+    ...(hasPoint(session, 'customer.list.delete') ? [{ key: 'delete', label: '删除', onClick: () => confirmText('删除客户', '确定删除该客户？', () => void act(`/api/money/customers/${detailId}`, {}, 'DELETE').then((ok) => { if (ok) navigate('/customer/list'); })) }] : []),
+  ];
+
+  return <>
+    <div className="kgd-card kgd-cust-detail">
+      <div className="kgd-cust-detail-head">
+        <div className="kgd-cust-detail-head-left">
+          <h1 className="kgd-cust-detail-title">{String(customer.name ?? '')}</h1>
+          <div className="kgd-cust-detail-sub">
+            <span className="kgd-cust-detail-code">{String(customer.code ?? '')}</span>
+            <span className={`kgd-cust-pill ${active ? 'is-on' : 'is-off'}`}>{active ? '已启用' : '已禁用'}</span>
+            {followed ? <span className="kgd-cust-pill is-follow">已关注</span> : null}
+          </div>
+        </div>
+        <div className="kgd-cust-detail-ops">
+          <button type="button" className="kgd-cust-btn-edit" onClick={() => setOpen(customer)}>修改</button>
+          <Dropdown menu={{ items: moreItems }}>
+            <button type="button" className="kgd-cust-btn-more" title="更多" aria-label="更多">⋯</button>
+          </Dropdown>
+        </div>
+      </div>
+
+      <div className="kgd-cust-seg" role="tablist" aria-label="客户详情分段">
+        <button type="button" role="tab" aria-selected={tab === 'info'} className={`kgd-cust-seg-item${tab === 'info' ? ' on' : ''}`} onClick={() => setTab('info')}>资料</button>
+        <button type="button" role="tab" aria-selected={tab === 'contacts'} className={`kgd-cust-seg-item${tab === 'contacts' ? ' on' : ''}`} onClick={() => setTab('contacts')}>联系人{contacts.length ? <span className="n">{contacts.length}</span> : null}</button>
+        <button type="button" role="tab" aria-selected={tab === 'addresses'} className={`kgd-cust-seg-item${tab === 'addresses' ? ' on' : ''}`} onClick={() => setTab('addresses')}>地址{addresses.length ? <span className="n">{addresses.length}</span> : null}</button>
+      </div>
+
+      <div className="kgd-cust-pane" role="tabpanel">
+        {tab === 'info' && (
+          <div className="kgd-cust-info-card">
+            <div className="kgd-cust-info-h"><h3>基础信息</h3></div>
+            <dl className="kgd-cust-dl">
+              <div className="kgd-cust-dl-row"><dt>编号</dt><dd className="is-blue">{String(customer.code ?? '—')}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>电话</dt><dd>{String(customer.contact_phone || '—')}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>联系人</dt><dd>{String(customer.contact_name || '—')}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>地址</dt><dd>{addrLine}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>标签</dt><dd>{tags.length ? <div className="kgd-cust-tags">{tags.map((t) => <span key={t} className="kgd-cust-pill">{t}</span>)}</div> : '—'}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>负责人</dt><dd>{String(customer.owner_name || '—')}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>创建人</dt><dd>{String(customer.owner_name || '—')}</dd></div>
+              <div className="kgd-cust-dl-row"><dt>创建时间</dt><dd>{beijingTime(String(customer.created_at ?? ''), '—')}</dd></div>
+            </dl>
+          </div>
+        )}
+
+        {tab === 'contacts' && (
+          <div className="kgd-cust-list-card">
+            <div className="kgd-cust-info-h"><h3>联系人</h3><span className="hint">{contacts.length ? `共 ${contacts.length} 人` : ''}</span></div>
+            {contacts.length === 0 ? (
+              <div className="kgd-cust-empty">暂无联系人，可在「修改」中维护首要联系人</div>
+            ) : contacts.map((c) => {
+              const isPrimary = String(c.name ?? '') === String(customer.contact_name ?? '') && String(c.phone ?? '') === String(customer.contact_phone ?? '');
+              return (
+                <div key={String(c.id)} className="kgd-cust-mini">
+                  <div className="kgd-cust-mini-top">
+                    <span className="kgd-cust-mini-name">{String(c.name || '—')}</span>
+                    {isPrimary ? <span className="kgd-cust-mini-tag">首要</span> : null}
+                  </div>
+                  <div className="kgd-cust-mini-meta">{c.phone ? <span className="tel">{String(c.phone)}</span> : '无电话'}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'addresses' && (
+          <div className="kgd-cust-list-card">
+            <div className="kgd-cust-info-h"><h3>地址</h3><span className="hint">{addresses.length ? `共 ${addresses.length} 条` : ''}</span></div>
+            {addresses.length === 0 ? (
+              <div className="kgd-cust-empty">暂无地址，可在「修改」中填写地区与详细地址</div>
+            ) : addresses.map((a) => {
+              const line = [a.region, a.detail].filter(Boolean).join(' · ') || '—';
+              const isDef = String(a.region ?? '') === String(customer.region ?? '') && String(a.detail ?? '') === String(customer.address ?? '');
+              return (
+                <div key={String(a.id)} className="kgd-cust-mini">
+                  <div className="kgd-cust-mini-top">
+                    <span className="kgd-cust-mini-name">{line}</span>
+                    {isDef ? <span className="kgd-cust-mini-tag is-def">默认</span> : null}
+                  </div>
+                  {a.region ? <div className="kgd-cust-mini-meta">{String(a.region)}</div> : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+    {open && typeof open === 'object' && <CustomerModal row={open} tags={settingsTags} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); message.success('已保存'); }} />}
+  </>;
 }
 
 export function CustomerModal({ row, tags, onClose, onSaved }: { row: Rec | null; tags: Rec[]; onClose: () => void; onSaved: () => void }) {

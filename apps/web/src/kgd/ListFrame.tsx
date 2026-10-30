@@ -1,10 +1,21 @@
 import { isValidElement, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Alert, Button, Checkbox, DatePicker, Dropdown, Empty, Input, Modal, Pagination, Select, Table, Tooltip, TreeSelect } from 'antd';
+import { Alert, Button, Checkbox, DatePicker, Drawer, Dropdown, Empty, Input, Modal, Pagination, Select, Table, Tooltip, TreeSelect } from 'antd';
 import dayjs from 'dayjs';
 import type { MenuProps } from 'antd';
-import { ClearOutlined, PlusOutlined, SlidersOutlined } from '@ant-design/icons';
+import { ClearOutlined, PlusOutlined, SettingOutlined, SlidersOutlined } from '@ant-design/icons';
+
+/** 拼图图标（antd 无 PuzzleOutlined）；方案C 小方图标钮用。 */
+function PuzzleTileIcon() {
+  return (
+    <span className="anticon kgd-tool-icon-glyph" role="img" aria-label="puzzle">
+      <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true">
+        <path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z" />
+      </svg>
+    </span>
+  );
+}
 import { HeaderFilterTitle, dedupeHeaderOptions } from './HeaderFilter';
 import type { HeaderFilterConfig } from './HeaderFilter';
 export type { HeaderFilterConfig, HeaderFilterOption } from './HeaderFilter';
@@ -52,7 +63,58 @@ function scopeChoiceOf(item?: { conditions?: Record<string, string>; scope?: str
   return item.scope || '';
 }
 
+
 const emptyKeys: string[] = [];
+
+const NARROW_MQ = '(max-width: 768px)';
+
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(NARROW_MQ).matches : false));
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(NARROW_MQ);
+    const onChange = () => setNarrow(mq.matches);
+    onChange();
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+  return narrow;
+}
+
+function isTextQueryField(field: QueryField) {
+  return !field.kind || field.kind === 'text';
+}
+
+function pickKeywordField(fields: QueryField[]) {
+  const texts = fields.filter(isTextQueryField);
+  if (!texts.length) return undefined;
+  const preferred = texts.find((field) => /^(q|keyword|search|name|title)$/i.test(field.key) || /名称|客户|关键词|搜索|标题/.test(field.label));
+  return preferred ?? texts[0];
+}
+
+function scoreCodeCol(column: { key: string; title: string }) {
+  const blob = `${column.key} ${column.title}`;
+  if (/code|编号|单号|工号|sku/i.test(blob)) return 3;
+  if (/^(id|no|number)$/i.test(column.key)) return 2;
+  return 0;
+}
+
+function scoreNameCol(column: { key: string; title: string }) {
+  const blob = `${column.key} ${column.title}`;
+  if (/name|title|名称|客户|商品|标题|品名/i.test(blob)) return 3;
+  return 0;
+}
+
+function scoreTagCol(column: { key: string; title: string }) {
+  const blob = `${column.key} ${column.title}`;
+  if (/tag|标签|status|状态|启用/.test(blob)) return 2;
+  return 0;
+}
+
 
 export function nodeText(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
@@ -64,6 +126,56 @@ export function nodeText(node: ReactNode): string {
     if (typeof props.text === 'string') return props.text;
   }
   return '';
+}
+
+
+function isInteractiveNode(node: ReactNode): boolean {
+  if (node === null || node === undefined || typeof node === 'boolean') return false;
+  if (Array.isArray(node)) return node.some(isInteractiveNode);
+  if (!isValidElement(node)) return false;
+  const type = (node as ReactElement).type;
+  if (type === 'a' || type === 'button') return true;
+  const props = (node as ReactElement<{ onClick?: unknown; href?: unknown; role?: unknown; className?: unknown; children?: ReactNode }>).props;
+  if (typeof props.onClick === 'function') return true;
+  if (typeof props.href === 'string' && props.href) return true;
+  if (props.role === 'button' || props.role === 'link') return true;
+  if (typeof props.className === 'string' && /\bkgd-link\b/.test(props.className)) return true;
+  return isInteractiveNode(props.children);
+}
+
+function renderMobileCardCode<T>(codeNode: ReactNode, row: T, onRow?: (row: T) => void) {
+  const text = nodeText(codeNode).trim() || '—';
+  if (isInteractiveNode(codeNode) || isValidElement(codeNode)) {
+    return (
+      <div
+        className="kgd-m-card-code"
+        style={{ pointerEvents: 'auto' }}
+        onClick={(event) => {
+          const target = event.target as HTMLElement | null;
+          if (target && target.closest('button, a, [role="button"], .kgd-link')) {
+            event.stopPropagation();
+          }
+        }}
+      >
+        {codeNode}
+      </div>
+    );
+  }
+  if (onRow) {
+    return (
+      <div className="kgd-m-card-code">
+        <button
+          type="button"
+          className="kgd-link"
+          style={{ color: 'inherit', font: 'inherit', pointerEvents: 'auto' }}
+          onClick={(event) => { event.stopPropagation(); onRow(row); }}
+        >
+          {typeof codeNode === 'string' || typeof codeNode === 'number' ? codeNode : text}
+        </button>
+      </div>
+    );
+  }
+  return <div className="kgd-m-card-code">{codeNode || text}</div>;
 }
 
 export function ListFrame<T extends { id: string | number }>({ pageKey, columns: allColumns, rows, loading, error, emptyTitle = '暂无数据', emptyDescription = '当前没有可显示的记录。', chips = [], chipValue, onChip, queryFields: allQueryFields, queryValue, onQuery, onSearch, onClear, onApplyQuery, toolbar, page, pageSize, total, onPage, clientPaging = true, limitNote, rowClassName, rowSelection, onRow, viewTabs, activeView, onView, extensionObject, extensionTitle, extensionRows = [], extensionTabs, extensionCanAdd = false, onExtensionAdd, onExtensionReorder, onExtensionDelete, mobileTabs, mobileFields, columnPrefs, onColumnPrefs, onApplyOthers, onMobileCards, defaultVisible, defaultLocked = emptyKeys, defaultQueryKeys, moreItems, summary, onVisibleKeys, onMore, queryNode, beforeTools, viewMenu, onViewAction, onAddView, exportName, pageSizeOptions = [10, 20, 30, 50, 100], applySpecColumns, showExtension = true, showMobileCard = false, showOperationLog = false, onOperationLog, showColumnConfig = true, afterExtension, showAdvancedSearch, primaryTools = false, exportAll = true, showMore = true, advancedWithQuery = false, hideQueryFields = false, queryAlign = 'start', splitTools = false, viewFieldModule = '列表', treeExpand }: {
@@ -258,6 +370,8 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
   const [columnOpen, setColumnOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [extOpen, setExtOpen] = useState(false);
+  const isNarrow = useIsNarrow();
+  const [filterOpen, setFilterOpen] = useState(false);
   const [queryKeys, setQueryKeys] = useState<string[]>(() => {
     const stored = loadJson<string[] | null>(queryStorageKey(String(session.user.id), pageKey), null);
     const all = queryFields.map((field) => field.key);
@@ -571,24 +685,78 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
   const viewFields = columns.filter((column) => column.key !== 'actions').map((column) => ({ key: column.key, label: column.title }));
   const canApplyOthers = !!onApplyOthers || hasPermission(session, 'configuration.manage') || session.role === 'admin';
   const visibleChips = chips.filter((group) => !group.missing);
+  const listCardTab = resolvedMobileTabs[0]?.key ?? 'list';
+  const configuredCardKeys = useMemo(
+    () => (cards[listCardTab] ?? []).filter((key) => visible.some((column) => column.key === key) || columns.some((column) => column.key === key)),
+    [cards, columns, listCardTab, visible],
+  );
+  const actionColumn = visible.find((column) => column.key === 'actions' || column.title === '操作')
+    ?? columns.find((column) => column.key === 'actions' || column.title === '操作');
+  const cardBodyColumns = useMemo(() => {
+    const pool = visible.filter((column) => column.key !== 'actions' && column.title !== '操作');
+    if (configuredCardKeys.length) {
+      const ordered = configuredCardKeys.map((key) => pool.find((column) => column.key === key) ?? columns.find((column) => column.key === key)).filter((column): column is ListColumn<T> => !!column && column.key !== 'actions');
+      return ordered.length ? ordered : pool;
+    }
+    // 智能兜底：编号 / 名称 / 标签优先，其余可见列摘要
+    const ranked = [...pool].sort((a, b) => (scoreCodeCol(b) + scoreNameCol(b) * 10 + scoreTagCol(b)) - (scoreCodeCol(a) + scoreNameCol(a) * 10 + scoreTagCol(a)));
+    const code = pool.find((column) => scoreCodeCol(column) > 0) ?? ranked[0];
+    const name = pool.find((column) => column !== code && scoreNameCol(column) > 0) ?? pool.find((column) => column !== code);
+    const tags = pool.filter((column) => column !== code && column !== name && scoreTagCol(column) > 0);
+    const rest = pool.filter((column) => column !== code && column !== name && !tags.includes(column));
+    return [code, name, ...tags, ...rest].filter((column): column is ListColumn<T> => !!column);
+  }, [columns, configuredCardKeys, visible]);
+  const keywordField = useMemo(() => pickKeywordField(queryFields), [queryFields]);
+  const keywordPlaceholder = useMemo(() => {
+    if (!keywordField) return '搜索';
+    if (/customer/i.test(pageKey) || /客户/.test(keywordField.label)) return keywordField.placeholder ?? '搜索客户';
+    return keywordField.placeholder ?? `搜索${keywordField.label}`;
+  }, [keywordField, pageKey]);
+  function renderQueryControl(field: QueryField) {
+    if (field.kind === 'select') {
+      const raw = queryValue[field.key] || '';
+      const options = field.options ?? [];
+      const matched = Boolean(raw) && options.some((option) => String(option.value) === String(raw));
+      const placeholder = raw && !matched && options.length === 0 ? '加载中' : '请选择';
+      return <Select className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={placeholder} value={matched ? raw : undefined} options={options} onChange={(value) => onQuery(field.key, value ?? '')} />;
+    }
+    if (field.kind === 'tree') {
+      return <TreeSelect className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={field.placeholder ?? '请选择'} treeData={field.treeData} value={queryValue[field.key] || undefined} onChange={(value) => onQuery(field.key, value ?? '')} />;
+    }
+    if (field.kind === 'date') {
+      return <DatePicker className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} placeholder={field.placeholder ?? '请选择日期'} value={queryValue[field.key] ? dayjs(queryValue[field.key]) : null} onChange={(value) => onQuery(field.key, value ? value.format('YYYY-MM-DD') : '')} />;
+    }
+    return <Input className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={field.placeholder ?? '请输入'} title={field.label} value={queryValue[field.key] ?? ''} onChange={(event) => onQuery(field.key, event.target.value)} onPressEnter={onSearch} />;
+  }
   function advancedBtn(type: 'primary' | 'default') {
     if (!advancedOn) return null;
     return <Button type={type} onClick={() => setAdvOpen((open) => !open)}>高级查询</Button>;
   }
+  const narrowExtraMore = (showMore ? (more ?? []) : []).filter((item): item is NonNullable<typeof item> => !!item && typeof item === 'object' && 'key' in item);
+  const narrowOverflowItems: MenuProps['items'] = [
+    ...(showMobileCard ? [{ key: '__mobile_card__', label: '移动端卡片配置', onClick: () => setCardOpen(true) }] : []),
+    ...(showOperationLog && onOperationLog ? [{ key: '__op_log__', label: '操作记录', onClick: () => onOperationLog?.() }] : []),
+    ...narrowExtraMore,
+  ];
   const moreButton = showMore
     ? <Dropdown menu={{ items: more, onClick: ({ key }) => onMore?.(String(key)) }}><Button type="primary">更多操作</Button></Dropdown>
     : null;
+  const narrowMoreButton = (narrowOverflowItems?.length ?? 0) > 0
+    ? <Dropdown menu={{ items: narrowOverflowItems, onClick: ({ key }) => { if (String(key) === '__mobile_card__' || String(key) === '__op_log__') return; onMore?.(String(key)); } }} overlayClassName="kgd-m-more-dropdown"><Button className="kgd-m-more-btn" aria-label="更多">⋯</Button></Dropdown>
+    : null;
   const showViewBar = managedViews || !!onAddView || (viewTabs?.length ?? 0) > 0;
   const tailTools = (extensionType: 'primary' | 'default') => <>
-    {showOperationLog && onOperationLog ? <Button onClick={onOperationLog}>操作记录</Button> : null}
+    {(!isNarrow && showOperationLog && onOperationLog) ? <Button onClick={onOperationLog}>操作记录</Button> : null}
     {printSlot}
-    {extensionVisible && <Button type={extensionType} onClick={() => setExtOpen(true)}>扩展字段</Button>}
+    {extensionVisible && <Tooltip title="扩展字段"><Button className="kgd-tool-icon" aria-label="扩展字段" title="扩展字段" onClick={() => setExtOpen(true)} icon={<PuzzleTileIcon />} /></Tooltip>}
     {afterExtension}
-    {showMobileCard && <Button type={extensionType} onClick={() => setCardOpen(true)}>移动端卡片配置</Button>}
-    {showColumnConfig && <Button type={extensionType} onClick={() => setColumnOpen(true)}>列配置</Button>}
-    {moreButton}
+    {(!isNarrow && showMobileCard) && <Button type={extensionType} onClick={() => setCardOpen(true)}>移动端卡片配置</Button>}
+    {showColumnConfig && <Tooltip title="列配置"><Button className="kgd-tool-icon" aria-label="列配置" title="列配置" onClick={() => setColumnOpen(true)} icon={<SettingOutlined />} /></Tooltip>}
+    {isNarrow ? narrowMoreButton : moreButton}
   </>;
-  return <div className="kgd-card">
+  /** 方案A：关键字查询 + 侧钮 + 扩展/列配置收成单行（联系人等 hideQueryFields+end） */
+  const compactSingleRow = queryAlign === 'end' && hideQueryFields;
+  return <div className={`kgd-card${isNarrow ? ' kgd-card--narrow' : ''}`}>
     {showViewBar && <div className="kgd-views">
       {managedViews ? managedTabs.map((tab) => {
         const active = currentView === tab.key;
@@ -602,27 +770,53 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
       {(managedViews || onAddView) && <Button type="text" icon={<PlusOutlined />} aria-label="视图管理" onClick={() => onAddView ? onAddView() : openViewEdit()} />}
     </div>}
     {error && <Alert type="error" showIcon style={{ marginBottom: 8 }} message={error} />}
+    {compactSingleRow ? (
+      <div className={`kgd-toolbar kgd-toolbar-split${isNarrow ? ' kgd-m-toolbar' : ''}`}>
+        <div className="kgd-toolbar" style={{ margin: 0 }}>
+          {toolbar}
+          {extraSpecButtons.map((btn) => <Button key={btn} onClick={() => openSpecDialog(btn)}>{btn}</Button>)}
+          {!advancedWithQuery && advancedBtn(primaryTools ? 'primary' : 'default')}
+        </div>
+        <div className="kgd-toolbar kgd-toolbar-compact-right">
+          {visibleChips.map((group) => <div className="kgd-chips" key={group.key} style={{ marginBottom: 0 }}><b>{group.label}</b>{group.options.filter((option) => !option.disabled).map((option) => <button key={option.value} className={`kgd-chip ${(chipValue?.[group.key] ?? 'all') === option.value ? 'on' : ''}`} onClick={() => onChip?.(group.key, option.value)}>{option.label}</button>)}</div>)}
+          {queryNode}
+          <div className="kgd-q-side">
+            <Button type="primary" aria-label="查询" onClick={onSearch}>查询</Button>
+            <Tooltip title="清除查询条件"><Button aria-label="清除查询条件" icon={<ClearOutlined />} onClick={onClear} /></Tooltip>
+            {advancedWithQuery && advancedBtn(primaryTools ? 'primary' : 'default')}
+          </div>
+          {beforeTools}
+          {tailTools(primaryTools ? 'primary' : 'default')}
+        </div>
+      </div>
+    ) : <>
+    {isNarrow && !hideQueryFields ? (
+      <div className="kgd-q-compact">
+        {visibleChips.map((group) => <div className="kgd-chips" key={group.key}><b>{group.label}</b>{group.options.filter((option) => !option.disabled).map((option) => <button key={option.value} className={`kgd-chip ${(chipValue?.[group.key] ?? 'all') === option.value ? 'on' : ''}`} onClick={() => onChip?.(group.key, option.value)}>{option.label}</button>)}</div>)}
+        {queryNode}
+        <div className="kgd-q-compact-row">
+          {keywordField ? (
+            <Input
+              className="kgd-q-compact-input"
+              allowClear
+              placeholder={keywordPlaceholder}
+              value={queryValue[keywordField.key] ?? ''}
+              onChange={(event) => onQuery(keywordField.key, event.target.value)}
+              onPressEnter={onSearch}
+            />
+          ) : <Input className="kgd-q-compact-input" allowClear placeholder="搜索" disabled />}
+          <Button type="primary" className="kgd-q-compact-search" aria-label="查询" onClick={onSearch}>查询</Button>
+          <Button className={`kgd-q-compact-filter${filterOpen ? ' is-on' : ''}`} aria-label="筛选" onClick={() => setFilterOpen(true)}>筛选</Button>
+        </div>
+      </div>
+    ) : (
     <div className={`kgd-query${queryAlign === 'end' ? ' kgd-query-end' : ''}`}>
       <div className="kgd-query-wrap">
         <div className="kgd-query-main">
           {visibleChips.map((group) => <div className="kgd-chips" key={group.key}><b>{group.label}</b>{group.options.filter((option) => !option.disabled).map((option) => <button key={option.value} className={`kgd-chip ${(chipValue?.[group.key] ?? 'all') === option.value ? 'on' : ''}`} onClick={() => onChip?.(group.key, option.value)}>{option.label}</button>)}</div>)}
           {queryNode}
           {!hideQueryFields && <div className="kgd-q-group"><div className="kgd-query-fields kgd-query-fields--macos">{queryFields.filter((field) => queryKeys.includes(field.key)).map((field) => {
-            let control: ReactNode;
-            if (field.kind === 'select') {
-              const raw = queryValue[field.key] || '';
-              const options = field.options ?? [];
-              const matched = Boolean(raw) && options.some((option) => String(option.value) === String(raw));
-              const placeholder = raw && !matched && options.length === 0 ? '加载中' : '请选择';
-              control = <Select className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={placeholder} value={matched ? raw : undefined} options={options} onChange={(value) => onQuery(field.key, value ?? '')} />;
-            } else if (field.kind === 'tree') {
-              control = <TreeSelect className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={field.placeholder ?? '请选择'} treeData={field.treeData} value={queryValue[field.key] || undefined} onChange={(value) => onQuery(field.key, value ?? '')} />;
-            } else if (field.kind === 'date') {
-              control = <DatePicker className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} placeholder={field.placeholder ?? '请选择日期'} value={queryValue[field.key] ? dayjs(queryValue[field.key]) : null} onChange={(value) => onQuery(field.key, value ? value.format('YYYY-MM-DD') : '')} />;
-            } else {
-              control = <Input className="kgd-q-ctl" variant="borderless" style={{ width: '100%' }} allowClear placeholder={field.placeholder ?? '请输入'} title={field.label} value={queryValue[field.key] ?? ''} onChange={(event) => onQuery(field.key, event.target.value)} onPressEnter={onSearch} />;
-            }
-            return <div className="kgd-q-cell" key={field.key}><span className="kgd-q-lbl" title={field.label}>{field.label}</span>{control}</div>;
+            return <div className="kgd-q-cell" key={field.key}><span className="kgd-q-lbl" title={field.label}>{field.label}</span>{renderQueryControl(field)}</div>;
           })}</div></div>}
         </div>
         <div className="kgd-q-side">
@@ -634,18 +828,20 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
         </div>
       </div>
     </div>
+    )}
     {beforeTools ? <>
-      <div className="kgd-toolbar">{toolbar}{extraSpecButtons.map((btn) => <Button key={btn} onClick={() => openSpecDialog(btn)}>{btn}</Button>)}{!advancedWithQuery && advancedBtn('default')}</div>
-      <div className="kgd-toolbar kgd-toolbar-end">{beforeTools}{tailTools('primary')}</div>
-    </> : splitTools ? <div className="kgd-toolbar kgd-toolbar-split">
+      <div className={`kgd-toolbar${isNarrow ? ' kgd-m-toolbar' : ''}`}>{toolbar}{extraSpecButtons.map((btn) => <Button key={btn} onClick={() => openSpecDialog(btn)}>{btn}</Button>)}{!advancedWithQuery && advancedBtn('default')}</div>
+      <div className={`kgd-toolbar kgd-toolbar-end${isNarrow ? ' kgd-m-toolbar' : ''}`}>{beforeTools}{tailTools('primary')}</div>
+    </> : splitTools ? <div className={`kgd-toolbar kgd-toolbar-split${isNarrow ? ' kgd-m-toolbar' : ''}`}>
       <div className="kgd-toolbar" style={{ margin: 0 }}>{toolbar}{extraSpecButtons.map((btn) => <Button key={btn} onClick={() => openSpecDialog(btn)}>{btn}</Button>)}{!advancedWithQuery && advancedBtn(primaryTools ? 'primary' : 'default')}</div>
       <div className="kgd-toolbar" style={{ margin: 0 }}>{tailTools(primaryTools ? 'primary' : 'default')}</div>
-    </div> : <div className="kgd-toolbar">
+    </div> : <div className={`kgd-toolbar${isNarrow ? ' kgd-m-toolbar' : ''}`}>
       {toolbar}
       {extraSpecButtons.map((btn) => <Button key={btn} onClick={() => openSpecDialog(btn)}>{btn}</Button>)}
       {!advancedWithQuery && advancedBtn(primaryTools ? 'primary' : 'default')}
       {tailTools(primaryTools ? 'primary' : 'default')}
     </div>}
+    </>}
     {advOpen && <AdvSearchPanel fields={advFields.length ? advFields : queryFields.map((field) => field.label)} onSearch={() => { onSearch(); setAdvOpen(false); }} onClear={onClear} />}
     <Modal title={specDlg?.title || specDlg?.trigger} open={!!specDlg?.fields?.length} onCancel={() => setSpecDlg(null)} okText="确定" cancelText="取消" onOk={() => setSpecDlg(null)}>
       {(specDlg?.fields ?? []).map((field) => (
@@ -656,8 +852,86 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
       ))}
     </Modal>
     {summary}
-    <Table<T> size="small" rowKey="id" loading={loading} columns={tableColumns} dataSource={pageRows} pagination={false} scroll={{ x: 'max-content' }} rowClassName={rowClassName} locale={{ emptyText: loading ? '正在读取数据…' : <Empty description={<><div>{emptyTitle}</div><div className="kgd-muted">{emptyDescription}</div></>} /> }} expandable={treeExpand ? { expandedRowKeys: treeExpand.expandedRowKeys, onExpandedRowsChange: (keys) => treeExpand.onChange(keys.map((key) => typeof key === 'bigint' ? String(key) : key)) } : undefined} rowSelection={rowSelection ? { selectedRowKeys: rowSelection.selected, onChange: (keys) => rowSelection.onChange(keys.map(String)) } : undefined} onRow={onRow ? (record) => ({ onClick: () => onRow(record) }) : undefined} />
+    {isNarrow ? (
+      <div className="kgd-m-cards" aria-busy={loading || undefined}>
+        {loading && !pageRows.length ? <div className="kgd-m-cards-empty">正在读取数据…</div> : null}
+        {!loading && !pageRows.length ? <Empty description={<><div>{emptyTitle}</div><div className="kgd-muted">{emptyDescription}</div></>} /> : null}
+        {pageRows.map((row, index) => {
+          const cols = cardBodyColumns;
+          const codeCol = cols.find((column) => scoreCodeCol(column) > 0) ?? cols[0];
+          const nameCol = cols.find((column) => column !== codeCol && scoreNameCol(column) > 0) ?? cols.find((column) => column !== codeCol);
+          const rest = cols.filter((column) => column !== codeCol && column !== nameCol);
+          const codeNode = codeCol?.render ? codeCol.render(row, index) : '';
+          const nameNode = nameCol?.render ? nameCol.render(row, index) : '';
+          const ops = actionColumn?.render ? actionColumn.render(row, index) : null;
+          return (
+            <div
+              key={String(row.id)}
+              className={`kgd-m-card${rowClassName ? ` ${rowClassName(row)}` : ''}`}
+              onClick={onRow ? () => onRow(row) : undefined}
+              role={onRow ? 'button' : undefined}
+            >
+              <div className="kgd-m-card-top">
+                {renderMobileCardCode(codeNode, row, onRow)}
+                {ops ? <div className="kgd-m-card-ops" onClick={(event) => event.stopPropagation()}>{ops}</div> : null}
+              </div>
+              {nameCol ? (
+                <div
+                  className="kgd-m-card-title"
+                  onClick={(event) => {
+                    const target = event.target as HTMLElement | null;
+                    if (target && target.closest('button, a, [role="button"], .kgd-link, .kgd-heart')) {
+                      event.stopPropagation();
+                    }
+                  }}
+                >{nameNode || '—'}</div>
+              ) : null}
+              {rest.length > 0 ? (
+                <div className="kgd-m-card-bottom">
+                  {rest.map((column) => {
+                    const raw = column.render ? column.render(row, index) : '';
+                    const text = nodeText(raw).trim();
+                    if (!text && raw == null) return null;
+                    const pill = scoreTagCol(column) > 0 || /tag|标签|启用|状态|关注/.test(`${column.key}${column.title}`);
+                    if (pill) {
+                      return <span key={column.key} className="kgd-m-pill">{raw || text || '—'}</span>;
+                    }
+                    return <span key={column.key} className="kgd-m-meta">{column.title} {text || '—'}</span>;
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <Table<T> size="small" rowKey="id" loading={loading} columns={tableColumns} dataSource={pageRows} pagination={false} scroll={{ x: 'max-content' }} rowClassName={rowClassName} locale={{ emptyText: loading ? '正在读取数据…' : <Empty description={<><div>{emptyTitle}</div><div className="kgd-muted">{emptyDescription}</div></>} /> }} expandable={treeExpand ? { expandedRowKeys: treeExpand.expandedRowKeys, onExpandedRowsChange: (keys) => treeExpand.onChange(keys.map((key) => typeof key === 'bigint' ? String(key) : key)) } : undefined} rowSelection={rowSelection ? { selectedRowKeys: rowSelection.selected, onChange: (keys) => rowSelection.onChange(keys.map(String)) } : undefined} onRow={onRow ? (record) => ({ onClick: () => onRow(record) }) : undefined} />
+    )}
     <div className="kgd-foot"><span>{limitNote}</span><Pagination current={page} pageSize={pageSize} total={clientPaging ? filteredRows.length : total} showSizeChanger pageSizeOptions={pageSizeOptions} showTotal={(count) => `共${count}条数据`} onChange={onPage} /></div>
+    <Drawer
+      className="kgd-m-filter-drawer"
+      title="筛选"
+      placement="bottom"
+      height="78%"
+      open={isNarrow && filterOpen}
+      onClose={() => setFilterOpen(false)}
+      destroyOnClose={false}
+      extra={<Button type="link" onClick={() => setFilterOpen(false)} aria-label="关闭筛选">关闭</Button>}
+      footer={<div className="kgd-m-filter-foot">
+        <Button className="kgd-m-filter-reset" onClick={() => { onClear(); }}>重置</Button>
+        <Button type="primary" className="kgd-m-filter-ok" onClick={() => { onSearch(); setFilterOpen(false); }}>查询</Button>
+      </div>}
+    >
+      <div className="kgd-m-filter-fields">
+        {queryFields.map((field) => (
+          <div className="kgd-m-filter-field" key={field.key}>
+            <label className="kgd-m-filter-label">{field.label}</label>
+            <div className="kgd-m-filter-ctl">{renderQueryControl(field)}</div>
+          </div>
+        ))}
+        {!queryFields.length ? <div className="kgd-muted">暂无筛选条件</div> : null}
+      </div>
+    </Drawer>
     <QueryConfigDrawer open={queryOpen} fields={queryFields} selected={queryKeys} onCancel={() => setQueryOpen(false)} onOk={(keys) => { setQueryKeys(keys); saveJson(queryStorageKey(String(session.user.id), pageKey), keys); setQueryOpen(false); }} />
     {showColumnConfig && <ColumnConfigModal open={columnOpen} columns={columns.map((column) => ({ key: column.key, label: column.title }))} value={prefs} onCancel={() => setColumnOpen(false)} onOk={(next) => { void commitColumns(next); }} onApplyOthers={canApplyOthers ? applyColumnPrefsToOthers : undefined} />}
     {showMobileCard && <MobileCardModal open={cardOpen} tabs={resolvedMobileTabs} fieldsByTab={resolvedMobileFields} value={cards} onCancel={() => setCardOpen(false)} onOk={(next) => { setCards(next); Object.entries(next).forEach(([tab, fields]) => saveJson(cardStorageKey(String(session.user.id), pageKey, tab), fields)); onMobileCards?.(next); setCardOpen(false); }} />}
