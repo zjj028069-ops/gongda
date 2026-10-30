@@ -1,24 +1,31 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.84",
-  "display": "SEDRIC01 v1.0.84",
-  "feature": "mobile-bill-flat-p41",
-  "hotfix": "20261029-mobile-bill-flat-v184",
+  "version": "1.0.85",
+  "display": "SEDRIC01 v1.0.85",
+  "feature": "onboarding-l1-guide",
+  "hotfix": "20261030-onboarding-l1-guide-v185",
   "primary": "#4184F4",
-  "released_at": "2026-10-29T18:43:57+08:00",
+  "released_at": "2026-10-30T09:18:46+08:00",
   "features": [
-    "P4.1：采购单据编辑 ≤768 去 Form 白卡套层，内容贴 Modal 单层白底",
-    "LineTable 窄屏行卡补齐：商品图片占位、类别 tag、行备注（可折）",
-    "ProductPicker 窄屏搜索/开关直铺 sheet，勿再套白卡",
-    "PC≥769 宽表/弹层原样",
-    "仅前端 shared.tsx + kgd.css；API/写库/密码未动；不开云端 Cursor"
+    "L1 引导式基础资料录入（手册 02→03）：欢迎卡 / 状态机 / 口语→草案 / 确认弹窗",
+    "localStorage sedric_onboarding_l1；可跳过、可继续开户引导",
+    "写库：确认后草案已确认待 MES 落库 + navigateMes 深链；禁止伪造审核/入库/结算",
+    "人员密码遮罩可显示一次；席位不足阻断；BOM 只预填打开 MES",
+    "仅 chat-shell；未改 apps/web 手机断点；未部署腾讯云、未重建库、未改密码",
+    "基线自 1.0.84 mobile-bill-flat-p41 递增"
   ],
-  "note": "热修：shared.tsx + kgd.css；未重建库、未改 .env/密码、未动 api",
-  "prev": "1.0.83 mobile-bill-pick-cards",
-  "tag": "mobile-bill-flat-p41",
-  "dist_js": "index-CriJyBQ0.js",
-  "dist_css": "index-Cw_vdb1_.css",
-  "dist_js_sha256": "75f85a485109b0eb65bcbced5df2a1cbb2d0e291323998ba4dc6625ad0ff60b6",
-  "dist_css_sha256": "6afc090c4340a885bfd0290e0f4a6994b96b5c68dc9f372330c3fe4c668af4e2",
-  "vps_backup": ".bak-20261029-mobile-bill-flat-v184"
+  "note": "chat-shell only；API 主数据写未接通时走待落库草案；与 Garment Agent 无关",
+  "prev": "1.0.84 mobile-bill-flat-p41",
+  "tag": "onboarding-l1-guide",
+  "dist_js": null,
+  "dist_css": null,
+  "chat_shell": {
+    "files": [
+      "chat-shell/app.js",
+      "chat-shell/index.html",
+      "chat-shell/styles.css",
+      "chat-shell/version.json",
+      "chat-shell/guide/onboarding-l1.js"
+    ]
+  }
 }

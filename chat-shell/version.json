@@ -1,4 +1,5 @@
 {
-  "version": "1.0.71",
-  "feature": "contract-empty-code"
+  "version": "1.0.85",
+  "feature": "onboarding-l1-guide",
+  "display": "SEDRIC01 v1.0.85"
 }

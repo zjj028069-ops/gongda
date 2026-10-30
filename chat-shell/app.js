@@ -1,5 +1,6 @@
 /**
- * 赛德瑞科 · 聊天壳（同域代理登录真实 MES · SEDRIC01 v1.0.56 mes-ready-shell）
+ * 赛德瑞科 · 聊天壳（同域代理登录真实 MES · SEDRIC01 v1.0.85 onboarding-l1-guide）
+ * L1：引导式基础资料（手册 02→03）；确认弹窗后草案/MES 深链；不代点审核入库结算
  * S0：进度/钱/工资 → /api/ai/factory/ask；附件 → /api/ai/intake/classify + 确认卡
  * S1：三本账结构化卡片 +「去处理」MES 深链；「查一下三本账」一次出三卡
  * S2：聊天一扔就落单（认型→确认卡→writes/confirm；合同打穿；other/unknown 追问）
@@ -8,7 +9,7 @@
 (function () {
   "use strict";
 
-  let VERSION = "SEDRIC01 v1.0.56";
+  let VERSION = "SEDRIC01 v1.0.85";
   const MES_LOAD_TIMEOUT_MS = 10000;
   let mesLoadTimer = null;
   let mesLoadGen = 0;
@@ -474,6 +475,74 @@
     setTimeout(preloadMes, 400);
     setTimeout(preloadMes, 1200);
     void refreshShellToolsRail();
+    bindOnboardingL1Host();
+    updateL1ResumeBanner();
+    setTimeout(function () {
+      try {
+        if (window.SedricOnboardingL1) window.SedricOnboardingL1.maybeAutoWelcome();
+      } catch (e) {}
+    }, 400);
+  }
+
+  function pushL1Assistant(msg) {
+    if (!THREADS.assistant) THREADS.assistant = [];
+    THREADS.assistant.push(msg);
+    persistChatState();
+    if (currentId === "assistant") renderThread();
+    else {
+      /* 欢迎卡挂在助手会话；不强制抢焦点时仍可稍后切换 */
+    }
+  }
+
+  function bindOnboardingL1Host() {
+    if (!window.SedricOnboardingL1 || typeof window.SedricOnboardingL1.bindHost !== "function") return;
+    window.SedricOnboardingL1.bindHost({
+      pushAssistant: function (msg) {
+        selectSession("assistant");
+        pushL1Assistant(msg);
+        updateL1ResumeBanner();
+      },
+      navigateMes: navigateMes,
+      showToast: showToast,
+      getUser: function () {
+        return currentUser;
+      },
+      selectAssistant: function () {
+        selectSession("assistant");
+      },
+      nowTime: nowTime,
+    });
+  }
+
+  function updateL1ResumeBanner() {
+    var banner = document.getElementById("l1-resume-banner");
+    if (!banner || !window.SedricOnboardingL1) return;
+    var st = window.SedricOnboardingL1.getState();
+    if (!st) {
+      banner.hidden = true;
+      return;
+    }
+    var vals = Object.keys(st.stepStates || {}).map(function (k) {
+      return st.stepStates[k];
+    });
+    var hasSkip = vals.some(function (x) {
+      return x === "skipped" || x === "not_started";
+    });
+    var anyProgress = vals.some(function (x) {
+      return x !== "not_started";
+    });
+    banner.hidden = !(anyProgress && hasSkip && st.currentStep !== "welcome" && st.global !== "done");
+  }
+
+  function startOnboardingL1Manual() {
+    bindOnboardingL1Host();
+    if (!window.SedricOnboardingL1) {
+      showToast("开户引导模块未加载");
+      return;
+    }
+    selectSession("assistant");
+    window.SedricOnboardingL1.resume();
+    updateL1ResumeBanner();
   }
 
   async function tryRestoreSession() {
@@ -483,6 +552,24 @@
       showApp();
       return true;
     } catch {
+      /* 本地无 API 时：?l1demo=1 进入 L1 演示（假管理员，不写现网） */
+      try {
+        var qs = new URLSearchParams(location.search || "");
+        if (qs.get("l1demo") === "1") {
+          try { sessionStorage.setItem("sedric_l1_force", "1"); } catch (e) {}
+          applyUser({
+            username: "l1demo",
+            display_name: "L1演示管理员",
+            role: "admin",
+            tenant_name: "本地演示",
+            goods_count: 0,
+            craft_count: 0,
+          });
+          showApp();
+          showToast("L1 本地演示（未连 MES API）");
+          return true;
+        }
+      } catch (e) {}
       showLogin();
       return false;
     }
@@ -1201,7 +1288,11 @@
             : "assistant";
     wrap.className = "msg " + roleClass;
 
-    if (m.confirm_card) {
+    if (m.l1_welcome && window.SedricOnboardingL1) {
+      window.SedricOnboardingL1.renderWelcomeCard(wrap);
+    } else if (m.l1_guide && window.SedricOnboardingL1) {
+      window.SedricOnboardingL1.renderGuideCard(wrap, m);
+    } else if (m.confirm_card) {
       wrap.appendChild(buildConfirmCard(m.confirm_card, m.preview_id));
     } else if (m.ext_ask) {
       wrap.appendChild(buildExtAskCard(m.ext_ask));
@@ -2073,6 +2164,24 @@
       if (currentId === (session && session.id)) renderThread();
     };
 
+    /* L1 开户引导：口语→草案→确认弹窗（优先于 FAQ/工厂助理） */
+    if (
+      session &&
+      session.kind === "bot" &&
+      (session.id === "assistant" || session.botKey === "assistant") &&
+      window.SedricOnboardingL1 &&
+      typeof window.SedricOnboardingL1.handleUserText === "function"
+    ) {
+      const L1 = window.SedricOnboardingL1;
+      if (L1.looksLikeL1Intent(text) || (L1.getState && L1.getState().global === "in_progress")) {
+        const handled = L1.handleUserText(text, false);
+        if (handled) {
+          persistChatState();
+          return;
+        }
+      }
+    }
+
     if (session && session.kind === "bot" && (session.id === "assistant" || session.botKey === "assistant") && looksLikeS3(text)) {
       if (!currentUser) {
         pushReply({
@@ -2542,6 +2651,8 @@
       openGroupChatModal();
     } else if (action === "new-chat") {
       startNewChat();
+    } else if (action === "onboarding-l1") {
+      startOnboardingL1Manual();
     }
   }
 
@@ -3128,6 +3239,14 @@
     }
 
     bindComposerDragDrop();
+
+    var l1ResumeBtn = document.getElementById("l1-btn-resume");
+    if (l1ResumeBtn && !l1ResumeBtn.dataset.bound) {
+      l1ResumeBtn.dataset.bound = "1";
+      l1ResumeBtn.addEventListener("click", function () {
+        startOnboardingL1Manual();
+      });
+    }
   }
 
   /* —— 供演示引擎调用 —— */
@@ -3135,7 +3254,10 @@
     openMes: openMes,
     closeMes: closeMes,
     navigateMes: navigateMes,
-    VERSION: VERSION
+    VERSION: VERSION,
+    startOnboardingL1: function () {
+      startOnboardingL1Manual();
+    },
   };
 
   function applyVersionLabels(ver) {

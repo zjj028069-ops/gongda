@@ -2511,3 +2511,279 @@ mark.ops {
 }
 .mes-skel-retry:hover,
 .mes-skel-force:hover { filter: brightness(1.08); }
+
+/* —— L1 开户引导（SEDRIC01 v1.0.85 onboarding-l1-guide）PC≥769 —— */
+.l1-welcome-card,
+.l1-guide-card {
+  max-width: 560px;
+}
+.l1-welcome-ul {
+  margin: 10px 0 4px 18px;
+  font-size: 13.5px;
+  color: var(--text-secondary, #6e6e73);
+  line-height: 1.55;
+}
+.l1-checklist {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+.l1-checklist-h {
+  font-size: 12px;
+  color: var(--text-secondary, #6e6e73);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.l1-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.l1-step-row .l1-ico {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #c7c7cc;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  color: #fff;
+}
+.l1-step-row.done .l1-ico {
+  background: #34c759;
+  border-color: #34c759;
+}
+.l1-step-row.active .l1-ico {
+  background: #4184F4;
+  border-color: #4184F4;
+}
+.l1-step-row.skipped .l1-ico {
+  background: #aeaeb2;
+  border-color: #aeaeb2;
+}
+.l1-step-row .l1-tag {
+  margin-left: auto;
+  font-size: 10px;
+  color: #8e8e93;
+}
+.l1-step-row.l1-future {
+  opacity: 0.45;
+  cursor: default;
+}
+.l1-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.l1-chip {
+  border: 1px solid rgba(65, 132, 244, 0.45);
+  background: rgba(65, 132, 244, 0.14);
+  color: #4184F4;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+}
+.l1-chip:hover {
+  background: rgba(65, 132, 244, 0.22);
+}
+.l1-chip-ghost {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.08);
+  color: #6e6e73;
+}
+.l1-menu-hint {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: #1a4db8;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(65, 132, 244, 0.08);
+  border: 1px solid rgba(65, 132, 244, 0.25);
+}
+.l1-hint {
+  font-size: 11px;
+  color: #8e8e93;
+  margin-top: 4px;
+}
+.l1-banner {
+  margin: 0 16px 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(65, 132, 244, 0.14);
+  border: 1px solid rgba(65, 132, 244, 0.45);
+  font-size: 12.5px;
+  color: #1a4db8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.l1-banner[hidden] {
+  display: none !important;
+}
+.l1-banner button {
+  border: none;
+  background: #4184F4;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.l1-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 24px;
+}
+.l1-overlay[hidden] {
+  display: none !important;
+}
+.l1-modal {
+  width: min(560px, 100%);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.l1-modal-hd {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.l1-modal-hd h2 {
+  font-size: 16px;
+  font-weight: 650;
+  margin: 0;
+}
+.l1-modal-sub {
+  font-size: 12px;
+  color: #8e8e93;
+  margin-top: 2px;
+}
+.l1-modal-bd {
+  padding: 16px 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.l1-modal-ft {
+  padding: 12px 20px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.l1-row-card {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fafafa;
+}
+.l1-row-card strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.l1-field {
+  margin-bottom: 10px;
+}
+.l1-field label {
+  display: block;
+  font-size: 12px;
+  color: #6e6e73;
+  margin-bottom: 4px;
+}
+.l1-field .req {
+  color: #ff3b30;
+}
+.l1-field input,
+.l1-field select {
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d1d1d6;
+  padding: 0 10px;
+  font-size: 13.5px;
+  background: #fff;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.l1-field input:focus,
+.l1-field select:focus {
+  outline: 2px solid rgba(65, 132, 244, 0.25);
+  border-color: #4184F4;
+}
+.l1-pwd-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.l1-pwd-row input {
+  flex: 1;
+}
+.l1-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 560;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  font-family: inherit;
+}
+.l1-btn-primary {
+  background: linear-gradient(145deg, #5a9aff, #4184F4);
+  color: #fff;
+  border: none;
+}
+.l1-btn-ghost {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  color: #8e8e93;
+  cursor: pointer;
+}
+.l1-btn-mini {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.l1-modal-x {
+  font-size: 20px;
+}
+
+@media (max-width: 768px) {
+  /* 本轮不改手机端行为；窄屏仅弱化 L1 新卡宽度，不新增手机验收 */
+  .l1-welcome-card,
+  .l1-guide-card {
+    max-width: 100%;
+  }
+}
