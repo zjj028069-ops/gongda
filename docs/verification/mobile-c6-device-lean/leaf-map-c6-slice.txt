@@ -1,0 +1,32 @@
+# C6 leaf-map slice
+| 36 | 精益生产 |  |  | 精益生产工作站 | lean-station | /LeanProductionReportChart/ReportChart | 功能 | /m/LeanProductionReportChart/ReportChart | lean-station/v5 | — | — | 必留 |  |
+| 37 | 精益生产 |  |  | 整改中心 | lean-rectify | /lean_production_todo/list | 功能 | /m/lean_production_todo/list | lean-rectify/v5 | 新增整改 | 可关联巡查 | 必留 |  |
+| 38 | 精益生产 |  |  | 精益会议 | lean-meeting | /meeting/list | 功能 | /m/meeting/list | lean-meeting/v5 | 新增会议 | — | 必留 |  |
+| 39 | 精益生产 |  |  | 会议待办 | lean-todo | /meetingTodo/list | 功能 | /m/meetingTodo/list | lean-todo/v5 | 新增待办 | 可关联会议 | 必留 |  |
+| 40 | 精益生产 |  |  | 现场巡查 | lean-patrol | /onsite_inspection/list | 功能 | /m/onsite_inspection/list | lean-patrol/v5 | 新增巡查 | — | 必留 |  |
+| 41 | 精益生产 |  |  | 精益生产设置 | lean-setting | /setting/lean_production | 功能 | /m/setting/lean_production | lean-setting/v5 | — | — | 必留 |  |
+
+| 69 | 设备维保 | 维保中心 |  | 维保计划 | maint-plan | /inspection_plan/list | 功能 | /m/inspection_plan/list | device-maint-plan/v5 | 新增维保计划 | — | 必留 |  |
+| 70 | 设备维保 | 维保中心 |  | 维保任务 | maint-task | /inspection_task/list | 功能 | /m/inspection_task/list | device-maint-task/v5 | （多由计划生成） | 上游：维保计划 | 必留 |  |
+| 71 | 设备维保 | 维保中心 |  | 维保记录 | maint-record | /inspection_record/list | 功能 | /m/inspection_record/list | device-maint-record/v5 | 新增维保记录 | 上游：维保任务 | 必留 |  |
+| 72 | 设备维保 | 维保中心 |  | 维保明细 | maint-break | /inspection_breakdown/list | 功能 | /m/inspection_breakdown/list | device-maint-break/v5 | — | — | 必留 |  |
+| 73 | 设备维保 | 维保中心 |  | 维保内容 | maint-content | /inspection_content/list | 功能 | /m/inspection_content/list | device-maint-content/v5 | 新增维保内容 | — | 必留 |  |
+| 74 | 设备维保 | 点检中心 |  | 点检计划 | pi-plan | /point_inspection_plan/list | 功能 | /m/point_inspection_plan/list | device-pi-plan/v5 | 新增点检计划 | — | 必留 |  |
+| 75 | 设备维保 | 点检中心 |  | 点检记录 | pi-record | /point_inspection_record/list | 功能 | /m/point_inspection_record/list | device-pi-record/v5 | 新增点检记录 | 上游：点检计划 | 必留 |  |
+| 76 | 设备维保 |  |  | 维修工单 | repair-order | /device_order/list | 功能 | /m/device_order/list | device-repair-order/v5 | 新增维修工单 | 可关联设备档案 | 必留 |  |
+| 77 | 设备维保 | 设备管理 |  | 设备档案 | device-archive | /device/list | 功能 | /m/device/list | device-archive/v5 | 新增设备 | — | 必留 |  |
+| 78 | 设备维保 | 设备管理 |  | 设备二维码 | device-qr | /device_qr_code/list | 功能 | /m/device_qr_code/list | device-qr/v5 | — | — | 必留 |  |
+| 79 | 设备维保 | 维保设置 |  | 基础设置 | equip-base | /setting/inspection/setting | 功能 | /m/setting/inspection/setting | device-setting/v5 | — | — | 必留 |  |
+
+| 精益生产 / 整改中心 | 新增整改 | 可关联巡查 |
+| 精益生产 / 精益会议 | 新增会议 | — |
+| 精益生产 / 会议待办 | 新增待办 | 可关联会议 |
+| 精益生产 / 现场巡查 | 新增巡查 | — |
+| 设备维保 / 维保计划 | 新增维保计划 | — |
+| 设备维保 / 维保任务 | （多由计划生成） | 上游：维保计划 |
+| 设备维保 / 维保记录 | 新增维保记录 | 上游：维保任务 |
+| 设备维保 / 维保内容 | 新增维保内容 | — |
+| 设备维保 / 点检计划 | 新增点检计划 | — |
+| 设备维保 / 点检记录 | 新增点检记录 | 上游：点检计划 |
+| 设备维保 / 维修工单 | 新增维修工单 | 可关联设备档案 |
+| 设备维保 / 设备档案 | 新增设备 | — |

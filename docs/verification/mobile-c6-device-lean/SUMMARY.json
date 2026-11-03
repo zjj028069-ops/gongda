@@ -1,0 +1,173 @@
+{
+  "version": "1.0.99",
+  "feature": "mobile-c6-device-lean",
+  "total": 27,
+  "passed": 27,
+  "leafPass": 17,
+  "leafTotal": 17,
+  "results": [
+    {
+      "n": "C6-L01",
+      "title": "≤768 列表 维保计划",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L02",
+      "title": "≤768 列表 维保任务",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L03",
+      "title": "≤768 列表 维保记录",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L04",
+      "title": "≤768 列表 维保明细",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L05",
+      "title": "≤768 列表 维保内容",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L06",
+      "title": "≤768 列表 点检计划",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L07",
+      "title": "≤768 列表 点检记录",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L08",
+      "title": "≤768 列表 维修工单",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L09",
+      "title": "≤768 列表 设备档案",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L10",
+      "title": "≤768 列表 设备二维码",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L11",
+      "title": "≤768 列表 维保设置",
+      "result": "通过",
+      "reason": "layout=v1-settings;plus=0;ui-clean"
+    },
+    {
+      "n": "C6-L12",
+      "title": "≤768 列表 精益生产工作站",
+      "result": "通过",
+      "reason": "layout=v1-station;plus=0;ui-clean"
+    },
+    {
+      "n": "C6-L13",
+      "title": "≤768 列表 整改中心",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L14",
+      "title": "≤768 列表 精益会议",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L15",
+      "title": "≤768 列表 会议待办",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L16",
+      "title": "≤768 列表 现场巡查",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;ui-clean"
+    },
+    {
+      "n": "C6-L17",
+      "title": "≤768 列表 精益生产设置",
+      "result": "通过",
+      "reason": "layout=v1-settings;plus=0;ui-clean"
+    },
+    {
+      "n": "C6-PLUS-ARCHIVE",
+      "title": "设备档案＋下拉（新增设备｜批量导入）",
+      "result": "通过",
+      "reason": "＋新增设备|导批量导入"
+    },
+    {
+      "n": "C6-PLUS-PI",
+      "title": "点检记录＋下拉（补录点检｜扫码点检）",
+      "result": "通过",
+      "reason": "＋补录点检|扫扫码点检"
+    },
+    {
+      "n": "C6-PLUS-REPAIR",
+      "title": "维修工单＋下拉（新建工单｜报修转工单）",
+      "result": "通过",
+      "reason": "＋新建工单|报报修转工单"
+    },
+    {
+      "n": "C6-UP-TASK-PLAN",
+      "title": "维保任务←计划 · 上游勾选完成(N)",
+      "result": "通过",
+      "reason": "已选 1 · 注塑机周检计划"
+    },
+    {
+      "n": "C6-UP-REC-TASK",
+      "title": "维保记录←任务 · 上游勾选完成(N)",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C6-UP-PI",
+      "title": "点检记录←计划 · 上游勾选完成(N)",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C6-UP-REPAIR",
+      "title": "维修工单←设备档案 · 上游勾选完成(N)",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C6-FN-TREE",
+      "title": "功能树可达设备维保 11 + 精益 6 叶子",
+      "result": "通过",
+      "reason": "device+lean C6 keys visible"
+    },
+    {
+      "n": "C6-PC-REDIRECT",
+      "title": "窄屏 PC 路径重定向 /ms 叶子",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/leaf?key=device-archive&title=%E8%AE%BE%E5%A4%87%E6%A1%A3%E6%A1%88&path=%2Fdevice%2Flist&l1=device"
+    },
+    {
+      "n": "C6-DESKTOP",
+      "title": "≥769 PC 侧栏未坏（无 ms-shell）",
+      "result": "通过",
+      "reason": "shell=0;sidebarCandidates=1"
+    }
+  ],
+  "note": "未 merge、未上腾讯云；业务写回为皮提示；临时皮待 Allen 重选"
+}
