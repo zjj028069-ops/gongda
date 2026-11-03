@@ -1,6 +1,6 @@
 {
-  "product": "SEDRIC01",
-  "version": "1.0.105",
-  "feature": "mobile-c9-iot-skin-final",
-  "hotfix": "20261103-mobile-c9-iot-skin-final"
+  "version": "1.0.106",
+  "display": "SEDRIC01 v1.0.106",
+  "feature": "mobile-c4-customer-skin-final",
+  "hotfix": "20261103-mobile-c4-customer-skin-final"
 }
