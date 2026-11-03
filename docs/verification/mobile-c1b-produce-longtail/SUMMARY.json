@@ -1,0 +1,122 @@
+{
+  "feature": "mobile-c1b-produce-longtail",
+  "version": "1.0.101",
+  "baseline": "1.0.92",
+  "leafPass": "12/12",
+  "total": "17/17",
+  "results": [
+    {
+      "n": "C1B-L01",
+      "title": "≤768 列表 项目管理",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L02",
+      "title": "≤768 列表 物料分析",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L03",
+      "title": "≤768 列表 全检",
+      "result": "通过",
+      "reason": "layout=v2-result;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L04",
+      "title": "≤768 列表 抽检",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L05",
+      "title": "≤768 列表 抽检明细",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L06",
+      "title": "≤768 列表 外协工单",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L07",
+      "title": "≤768 列表 外协验收",
+      "result": "通过",
+      "reason": "layout=v2-result;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L08",
+      "title": "≤768 列表 外协结算",
+      "result": "通过",
+      "reason": "layout=v2-amt;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L09",
+      "title": "≤768 列表 验收内容",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L10",
+      "title": "≤768 列表 成本分摊",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L11",
+      "title": "≤768 列表 不良品项",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-L12",
+      "title": "≤768 列表 溯源码管理",
+      "result": "通过",
+      "reason": "layout=v1-expand;plus=1;clean=1"
+    },
+    {
+      "n": "C1B-NO-DEV-COPY",
+      "title": "全叶子无夹具/硬约束/同源API/临时皮等禁字",
+      "result": "通过",
+      "reason": "project,material-analysis,qc-full,qc-spot,qc-spot-line,os-order,os-receipt,os-settle,os-content,cost,defect,trace"
+    },
+    {
+      "n": "C1B-PLUS-UPSTREAM",
+      "title": "外协工单＋→从加工单→完成(N)",
+      "result": "通过",
+      "reason": "已选 1 项，进入外协工单"
+    },
+    {
+      "n": "C1B-FUNCTIONS",
+      "title": "功能树生产管理可点进 12 叶",
+      "result": "通过",
+      "reason": "reachable=12"
+    },
+    {
+      "n": "C1B-PC-REDIRECT",
+      "title": "窄屏 PC path 重定向到 /ms/leaf",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/leaf?key=os-order&title=%E5%A4%96%E5%8D%8F%E5%B7%A5%E5%8D%95&path=%2FOutWorkOrder%2Flist&l1=produce"
+    },
+    {
+      "n": "C1B-DESKTOP",
+      "title": "≥769 PC 侧栏不动、无四栏壳",
+      "result": "通过",
+      "reason": "no-ms-shell"
+    }
+  ],
+  "pendingSkinReselect": [
+    "project 临时版4",
+    "material-analysis 临时版1",
+    "qc-spot 临时版3 状态Tabs",
+    "qc-spot-line 临时版4",
+    "os-content 临时版1",
+    "cost 临时版4",
+    "defect 临时版1"
+  ],
+  "notDeployed": true,
+  "noMerge": true
+}
