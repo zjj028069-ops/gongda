@@ -1,0 +1,238 @@
+{
+  "version": "SEDRIC01 v1.0.97 mobile-c4-customer",
+  "playwright": "22/22",
+  "leafLists": "12/12",
+  "routes": [
+    {
+      "leaf": "客户管理",
+      "key": "customer-list",
+      "pc": "/customer/list",
+      "ms": "/ms/leaf?key=customer-list&path=/customer/list",
+      "layout": "v1-sparse",
+      "plus": true
+    },
+    {
+      "leaf": "客户联系人",
+      "key": "linkman",
+      "pc": "/linkman/list",
+      "ms": "/ms/leaf?key=linkman&path=/linkman/list",
+      "layout": "v1-sparse",
+      "plus": true
+    },
+    {
+      "leaf": "客户跟单",
+      "key": "follow",
+      "pc": "/follow/list",
+      "ms": "/ms/leaf?key=follow&path=/follow/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "合同报价单",
+      "key": "quote",
+      "pc": "/contract_quotation_bill/list",
+      "ms": "/ms/leaf?key=quote&path=/contract_quotation_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "合同订单",
+      "key": "contract",
+      "pc": "/customer_contract/list",
+      "ms": "/ms/leaf?key=contract&path=/customer_contract/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "收支记录",
+      "key": "cash",
+      "pc": "/customer_financier/list",
+      "ms": "/ms/leaf?key=cash&path=/customer_financier/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "发票管理",
+      "key": "invoice",
+      "pc": "/customer_invoice/list",
+      "ms": "/ms/leaf?key=invoice&path=/customer_invoice/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "销售费用",
+      "key": "sales-fee",
+      "pc": "/selling_expenses/list",
+      "ms": "/ms/leaf?key=sales-fee&path=/selling_expenses/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "客户公海",
+      "key": "customer-sea",
+      "pc": "/customer_sea/list",
+      "ms": "/ms/leaf?key=customer-sea&path=/customer_sea/list",
+      "layout": "v1-sparse",
+      "plus": true
+    },
+    {
+      "leaf": "基础设置",
+      "key": "customer-base",
+      "pc": "/customer/setting/base_setting",
+      "ms": "/ms/leaf?key=customer-base&path=/customer/setting/base_setting",
+      "layout": "v1-settings",
+      "plus": false
+    },
+    {
+      "leaf": "审核设置",
+      "key": "customer-audit",
+      "pc": "/customer/setting/audit_setting",
+      "ms": "/ms/leaf?key=customer-audit&path=/customer/setting/audit_setting",
+      "layout": "v1-sparse",
+      "plus": true
+    },
+    {
+      "leaf": "销售价格追踪",
+      "key": "sales-price",
+      "pc": "/customer/salesPriceTrack",
+      "ms": "/ms/leaf?key=sales-price&path=/customer/salesPriceTrack",
+      "layout": "v4-track",
+      "plus": false
+    }
+  ],
+  "results": [
+    {
+      "n": "C4-L01",
+      "title": "≤768 列表 客户管理",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C4-L02",
+      "title": "≤768 列表 客户联系人",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C4-L03",
+      "title": "≤768 列表 客户跟单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L04",
+      "title": "≤768 列表 合同报价单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L05",
+      "title": "≤768 列表 合同订单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L06",
+      "title": "≤768 列表 收支记录",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L07",
+      "title": "≤768 列表 发票管理",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L08",
+      "title": "≤768 列表 销售费用",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C4-L09",
+      "title": "≤768 列表 客户公海",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C4-L10",
+      "title": "≤768 列表 基础设置",
+      "result": "通过",
+      "reason": "layout=v1-settings;plus=0"
+    },
+    {
+      "n": "C4-L11",
+      "title": "≤768 列表 审核设置",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C4-L12",
+      "title": "≤768 列表 销售价格追踪",
+      "result": "通过",
+      "reason": "layout=v4-track;plus=0"
+    },
+    {
+      "n": "C4-PLUS-QUOTE",
+      "title": "报价＋下拉（新增报价｜从合同复制）",
+      "result": "通过",
+      "reason": "＋新增报价|合从合同复制"
+    },
+    {
+      "n": "C4-PLUS-CONTRACT",
+      "title": "合同＋下拉（直接创建｜报价单创建）",
+      "result": "通过",
+      "reason": "＋直接创建|报报价单创建"
+    },
+    {
+      "n": "C4-PLUS-SEA",
+      "title": "公海＋下拉（领取客户｜分配销售）",
+      "result": "通过",
+      "reason": "领领取客户|分分配销售"
+    },
+    {
+      "n": "C4-UP-QUOTE-COPY",
+      "title": "报价从合同复制 · 上游勾选完成(N)",
+      "result": "通过",
+      "reason": "已选 1 · HT20261026008"
+    },
+    {
+      "n": "C4-UP-CONTRACT-QUOTE",
+      "title": "合同报价单创建上游 · 左勾顶已选右上完成(N)",
+      "result": "通过",
+      "reason": "完成(2)"
+    },
+    {
+      "n": "C4-SEA-CLAIM",
+      "title": "公海领取入口",
+      "result": "通过",
+      "reason": "完成(1)"
+    },
+    {
+      "n": "C4-TREE",
+      "title": "功能树可达客户管理 12 叶子（含报价/合同）",
+      "result": "通过",
+      "reason": "leaves=12"
+    },
+    {
+      "n": "C4-PC-REDIRECT",
+      "title": "窄屏 PC path 重定向 /ms",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/leaf?key=customer-list&title=%E5%AE%A2%E6%88%B7%E7%AE%A1%E7%90%86&path=%2Fcustomer%2Flist&l1=customer"
+    },
+    {
+      "n": "C4-QUOTE-CONTRACT-SAFE",
+      "title": "报价/合同入口与上游链路未丢",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C4-DESKTOP",
+      "title": "≥769 PC 侧栏未坏",
+      "result": "通过",
+      "reason": "sidebar-ok"
+    }
+  ],
+  "note": "未 merge、未上腾讯云、未重建库、未改密码、未动 garment；临时皮待 Allen 重选；空数据用夹具；业务写回为皮提示"
+}

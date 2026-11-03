@@ -1,9 +1,9 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.92",
-  "display": "SEDRIC01 v1.0.92",
-  "feature": "mobile-4tab-shell-p0",
-  "hotfix": "20261103-mobile-4tab-shell-p0",
+  "version": "1.0.97",
+  "display": "SEDRIC01 v1.0.97",
+  "feature": "mobile-c4-customer",
+  "hotfix": "20261103-mobile-c4-customer",
   "primary": "#4184F4",
-  "note": "mobile-4tab-shell-p0 on baseline v1.0.91; old v1.0.75 void"
+  "note": "mobile-c4-customer on baseline v1.0.92; did not rebase PR#3/#4/#5/#6"
 }

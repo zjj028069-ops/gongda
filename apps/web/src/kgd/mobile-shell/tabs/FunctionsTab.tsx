@@ -18,6 +18,10 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
+  /** 客户管理 12 叶子必须全显，禁止 slice(0,5) 把收支/发票/公海/设置挤进 overflow */
+  if (menu.key === 'customer') {
+    return { shown: kids, overflow: '' };
+  }
   const top = kids.slice(0, 5);
   const rest = kids.slice(5).map((item) => item.label);
   return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
@@ -61,11 +65,18 @@ export function FunctionsTab() {
                 {shown.map((node) => {
                   const nested = node.children?.length ? collectLeaves(node.children) : [];
                   if (nested.length) {
+                    const shownLeaves = menu.key === 'customer' ? nested : nested.slice(0, 6);
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {shownLeaves.map((leaf) => (
+                          <button
+                            key={leaf.key}
+                            type="button"
+                            className="ms-fn-sub"
+                            onClick={() => openLeaf(leaf, menu)}
+                            data-leaf-key={leaf.key}
+                          >
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
@@ -78,7 +89,13 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button
+                      key={node.key}
+                      type="button"
+                      className="ms-fn-sub"
+                      data-leaf-key={node.key}
+                      onClick={() => openLeaf(node, menu)}
+                    >
                       <i className="ms-dot" />
                       <span>
                         {node.label}
