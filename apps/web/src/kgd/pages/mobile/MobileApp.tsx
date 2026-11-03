@@ -33,6 +33,9 @@ export function MobileApp() {
       <Route path="report/order/:id" element={<PickTask />} />
       <Route path="report/task/:taskId" element={<ReportForm />} />
       <Route path="report/today" element={<TodayPage />} />
+      {/* 任务书路径别名 → 四栏壳镜像页（/m 报工应用与 /ms 四栏壳分离） */}
+      <Route path="staging/area" element={<Navigate to="/ms/staging/area" replace />} />
+      <Route path="message/list" element={<Navigate to="/ms/message/list" replace />} />
       <Route path="*" element={<Navigate to="/m/report" replace />} />
     </Routes>
   </div>;
