@@ -18,6 +18,10 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
+  /** C2：仓库管理需完整展开 15 叶子（跳过设置两项仍在树中可见但不做皮） */
+  if (menu.key === 'warehouse') {
+    return { shown: kids, overflow: '' };
+  }
   const top = kids.slice(0, 5);
   const rest = kids.slice(5).map((item) => item.label);
   return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
@@ -25,7 +29,7 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
 
 export function FunctionsTab() {
   const navigate = useNavigate();
-  const [openKey, setOpenKey] = useState<string | null>('customer');
+  const [openKey, setOpenKey] = useState<string | null>('warehouse');
   const menus = useMemo(() => primaryMenus, []);
 
   function openLeaf(node: MenuNode, l1: PrimaryMenu) {
@@ -64,13 +68,14 @@ export function FunctionsTab() {
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {(menu.key === 'warehouse' ? nested : nested.slice(0, 6)).map((leaf) => (
+                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)} data-leaf-key={leaf.key}>
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
                               {leaf.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                               {leaf.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
+                              {menu.key === 'warehouse' && leaf.key === 'flow' && <small className="ms-fn-note">只读 · 无＋</small>}
                             </span>
                           </button>
                         ))}
@@ -78,13 +83,14 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button key={node.key} type="button" className="ms-fn-sub" data-leaf-key={node.key} onClick={() => openLeaf(node, menu)}>
                       <i className="ms-dot" />
                       <span>
                         {node.label}
                         {node.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                         {node.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                         {node.key === 'plan' && <small className="ms-fn-note">生产计划MRP · 物料分析</small>}
+                        {menu.key === 'warehouse' && node.key === 'flow' && <small className="ms-fn-note">只读 · 无＋</small>}
                       </span>
                     </button>
                   );
