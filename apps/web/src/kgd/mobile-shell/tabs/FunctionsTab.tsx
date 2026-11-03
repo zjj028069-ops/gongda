@@ -18,6 +18,10 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
+  /** C7：报表中心 / 数据大屏完整展开，保证 22 叶可点进 */
+  if (menu.key === 'report' || menu.key === 'screen') {
+    return { shown: kids, overflow: '' };
+  }
   const top = kids.slice(0, 5);
   const rest = kids.slice(5).map((item) => item.label);
   return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
@@ -25,7 +29,7 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
 
 export function FunctionsTab() {
   const navigate = useNavigate();
-  const [openKey, setOpenKey] = useState<string | null>('customer');
+  const [openKey, setOpenKey] = useState<string | null>('report');
   const menus = useMemo(() => primaryMenus, []);
 
   function openLeaf(node: MenuNode, l1: PrimaryMenu) {
@@ -42,6 +46,7 @@ export function FunctionsTab() {
         const color = L1_ICON_COLORS[menu.key] || '#4184F4';
         const expanded = openKey === menu.key;
         const { shown, overflow } = firstChildren(menu);
+        const fullExpand = menu.key === 'report' || menu.key === 'screen';
         return (
           <div key={menu.key} className={`ms-fn-block ${expanded ? 'is-open' : ''}`} data-l1={menu.key}>
             <button
@@ -64,8 +69,8 @@ export function FunctionsTab() {
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {(fullExpand ? nested : nested.slice(0, 6)).map((leaf) => (
+                          <button key={leaf.key} type="button" className="ms-fn-sub" data-leaf-key={leaf.key} onClick={() => openLeaf(leaf, menu)}>
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
@@ -78,7 +83,7 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button key={node.key} type="button" className="ms-fn-sub" data-leaf-key={node.key} onClick={() => openLeaf(node, menu)}>
                       <i className="ms-dot" />
                       <span>
                         {node.label}
