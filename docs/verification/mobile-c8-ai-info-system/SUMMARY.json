@@ -1,0 +1,160 @@
+{
+  "feature": "mobile-c8-ai-info-system",
+  "version": "1.0.103",
+  "baseline": "main=v1.0.92",
+  "total": 24,
+  "passed": 24,
+  "failed": 0,
+  "results": [
+    {
+      "n": "C8-0",
+      "title": "窄屏四栏壳仍在 · 无 /m/*",
+      "result": "通过",
+      "reason": "消息|联系人|功能|设置"
+    },
+    {
+      "n": "C8-01",
+      "title": "叶可达 · ai-train",
+      "result": "通过",
+      "reason": "训练中心"
+    },
+    {
+      "n": "C8-02",
+      "title": "叶可达 · ai-center",
+      "result": "通过",
+      "reason": "赛德瑞克小助手"
+    },
+    {
+      "n": "C8-03",
+      "title": "叶可达 · ai-factory",
+      "result": "通过",
+      "reason": "工厂助理"
+    },
+    {
+      "n": "C8-04",
+      "title": "叶可达 · ai-bom",
+      "result": "通过",
+      "reason": "AI 导入 BOM"
+    },
+    {
+      "n": "C8-05",
+      "title": "叶可达 · ai-quick-order",
+      "result": "通过",
+      "reason": "极速下单"
+    },
+    {
+      "n": "C8-06",
+      "title": "叶可达 · ai-drawing",
+      "result": "通过",
+      "reason": "图纸拆单"
+    },
+    {
+      "n": "C8-07",
+      "title": "叶可达 · ai-glossary",
+      "result": "通过",
+      "reason": "本厂词典"
+    },
+    {
+      "n": "C8-08",
+      "title": "叶可达 · ai-ext-apps",
+      "result": "通过",
+      "reason": "扩展应用"
+    },
+    {
+      "n": "C8-09",
+      "title": "叶可达 · knowledge",
+      "result": "通过",
+      "reason": "知识库"
+    },
+    {
+      "n": "C8-10",
+      "title": "叶可达 · notice",
+      "result": "通过",
+      "reason": "通知公告"
+    },
+    {
+      "n": "C8-11",
+      "title": "叶可达 · personal",
+      "result": "通过",
+      "reason": "个人中心"
+    },
+    {
+      "n": "C8-12",
+      "title": "叶可达 · users",
+      "result": "通过",
+      "reason": "用户管理"
+    },
+    {
+      "n": "C8-13",
+      "title": "叶可达 · roles",
+      "result": "通过",
+      "reason": "角色管理"
+    },
+    {
+      "n": "C8-14",
+      "title": "叶可达 · teams",
+      "result": "通过",
+      "reason": "团队管理"
+    },
+    {
+      "n": "C8-15",
+      "title": "叶可达 · departments",
+      "result": "通过",
+      "reason": "部门管理"
+    },
+    {
+      "n": "C8-16",
+      "title": "叶可达 · audit",
+      "result": "通过",
+      "reason": "操作日志"
+    },
+    {
+      "n": "C8-17",
+      "title": "叶可达 · basics",
+      "result": "通过",
+      "reason": "通用设置"
+    },
+    {
+      "n": "C8-18",
+      "title": "叶可达 · company",
+      "result": "通过",
+      "reason": "企业信息设置"
+    },
+    {
+      "n": "C8-19",
+      "title": "叶可达 · sms",
+      "result": "通过",
+      "reason": "短信设置"
+    },
+    {
+      "n": "C8-20",
+      "title": "叶可达 · code-rules",
+      "result": "通过",
+      "reason": "自定义编号规则"
+    },
+    {
+      "n": "C8-21",
+      "title": "设置栏双入口 · personal/basics/company/sms/code-rules",
+      "result": "通过",
+      "reason": "personal|basics|company|sms|code-rules"
+    },
+    {
+      "n": "C8-22",
+      "title": "功能树双入口抽检 · system 设置组 + personal",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C8-23",
+      "title": "宽屏 ≥769 PC 壳不被手机壳覆盖",
+      "result": "通过",
+      "reason": "desktop"
+    }
+  ],
+  "notes": [
+    "未 merge、未上腾讯云、未重建库、未改开发账号密码",
+    "未 rebase / 未合入 PR#3～#12",
+    "消息列表属 C0、物联属 C9 本波不做",
+    "截图仅 Playwright"
+  ]
+}
