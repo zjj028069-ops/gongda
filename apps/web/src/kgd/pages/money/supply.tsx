@@ -173,7 +173,7 @@ function PlanModal({ row, onClose }: { row: Rec | null; onClose: () => void }) {
     }
     catch (error) { message.error(showError(error)); }
   }
-  return <Modal title={row ? '修改采购计划' : '新增采购计划'} open width={980} onCancel={onClose} onOk={save} okText="确定" cancelText="取消">
+  return <Modal title={row ? '修改采购计划' : '新增采购计划'} open width={980} wrapClassName="kgd-bill-modal" onCancel={onClose} onOk={save} okText="确定" cancelText="取消">
     <Form layout="vertical">
       <Form.Item label="计划编号"><Input value={code} placeholder={codePlaceholder} onChange={(event) => setCode(event.target.value)} /></Form.Item>
       <Form.Item label="计划名称" required><Input value={name} onChange={(event) => setName(event.target.value)} /></Form.Item>
@@ -335,7 +335,7 @@ function PurchaseModal({ row, analysisId = '', onClose }: { row: Rec | null; ana
       message.success('已保存'); onClose();
     } catch (error) { message.error(showError(error)); }
   }
-  return <Modal title={row ? '修改采购单' : '新增采购单'} open width={1080} onCancel={onClose} onOk={save} okText="保存" cancelText="取消" confirmLoading={money.busy}>
+  return <Modal title={row ? '修改采购单' : '新增采购单'} open width={1080} wrapClassName="kgd-bill-modal" onCancel={onClose} onOk={save} okText="保存" cancelText="取消" confirmLoading={money.busy}>
     <Form layout="vertical">
       <Form.Item label="采购单号"><Input value={row ? row.code : code} placeholder={codePlaceholder} disabled={!!row} onChange={(event) => setCode(event.target.value)} /></Form.Item>
       <Form.Item label="供应商"><Select showSearch optionFilterProp="label" placeholder={searchPlaceholder} value={supplierId || undefined} options={(suppliers.data?.items ?? []).map((item) => ({ value: item.id, label: item.name }))} onChange={setSupplierId} /></Form.Item>

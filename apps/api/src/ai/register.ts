@@ -41,6 +41,7 @@ import { createLiteRecord, listLiteRecords, patchLiteRecord } from './lite-app.j
 import { runShellPdfOp, takeShellPdfDownload, type PdfOp } from './shell-tool-pdf.js';
 import { extractImageFields } from './shell-tool-vision.js';
 import { safeEvalExpression, shellOperatorHint } from './shell-tool.js';
+import { resolveOnboardingUtterance } from './onboarding-nlu.js';
 
 type ChatBody = {
   messages?: ChatMessage[];
@@ -422,6 +423,23 @@ export function registerAi(app: FastifyInstance, services: Services) {
     const result = await member(services, request, false, async (sql, actor) => {
       const body = (request.body ?? {}) as { ask_id?: unknown; option_id?: unknown };
       return resolveExtAsk(sql, actor, body);
+    });
+    return reply.send(result);
+  });
+
+  /** L1 开户引导 NLU：只返回草案 JSON，绝不写业务表 */
+  app.post('/api/ai/onboarding/parse', async (request, reply) => {
+    const result = await member(services, request, false, async () => {
+      const body = (request.body ?? {}) as {
+        text?: unknown;
+        currentStep?: unknown;
+        confirmedSummary?: unknown;
+      };
+      const text = typeof body.text === 'string' ? body.text : '';
+      const currentStep = typeof body.currentStep === 'string' ? body.currentStep : undefined;
+      const confirmedSummary =
+        typeof body.confirmedSummary === 'string' ? body.confirmedSummary : undefined;
+      return resolveOnboardingUtterance(text, { currentStep, confirmedSummary });
     });
     return reply.send(result);
   });

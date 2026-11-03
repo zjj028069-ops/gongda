@@ -1,4 +1,5 @@
 {
-  "version": "1.0.71",
-  "feature": "contract-empty-code"
+  "version": "1.0.90",
+  "feature": "fluent-chitchat-guard",
+  "display": "SEDRIC01 v1.0.90"
 }

@@ -348,6 +348,8 @@ export function WorkplacePage() {
   const [todoEditOpen, setTodoEditOpen] = useState(false);
   const [followOpen, setFollowOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  /** ≤768：工作台强制单列展示（不写回 layout）；≥769 仍用绝对定位双栏 */
+  const [isNarrow, setIsNarrow] = useState(false);
 
   const savedCards = useMemo(() => mergeCards(config.data?.cards), [config.data]);
   const savedLayout = useMemo(() => {
@@ -373,6 +375,14 @@ export function WorkplacePage() {
     const onChange = () => setFullscreen(document.fullscreenElement === root.current);
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const apply = () => setIsNarrow(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
   }, []);
 
   useEffect(() => {
@@ -675,8 +685,12 @@ export function WorkplacePage() {
   };
 
   const boardH = Math.max(8, layout.reduce((sum, item) => Math.max(sum, item.y + item.h), 0) + (editing ? 2 : 0));
+  /** 窄屏按视觉自上而下排序，配合 CSS 单列 flex；不改存盘 layout */
+  const viewLayout = isNarrow
+    ? [...layout].sort((a, b) => a.y - b.y || a.x - b.x)
+    : layout;
 
-  return <div ref={root} className={`wp-root ${fullscreen ? 'wp-full' : ''} ${editing ? 'wp-editing' : ''}`} data-testid="wp-root">
+  return <div ref={root} className={`wp-root ${fullscreen ? 'wp-full' : ''} ${editing ? 'wp-editing' : ''}${isNarrow ? ' is-narrow' : ''}`} data-testid="wp-root">
     {editing ? (
     <div className="wp-toolbar">
         <Button onClick={() => setAddOpen(true)}>添加组件</Button>
@@ -686,8 +700,8 @@ export function WorkplacePage() {
     ) : null}
     {summary.error && <div className="kgd-banner">{summary.error}</div>}
     <div className="wp-canvas-shell" data-testid="wp-canvas-shell">
-      <div className="wp-board" style={{ height: boardH * ROW_H }} data-testid="wp-board">
-        {layout.map((item) => <WidgetShell
+      <div className="wp-board" style={{ height: isNarrow ? undefined : boardH * ROW_H }} data-testid="wp-board">
+        {viewLayout.map((item) => <WidgetShell
           key={item.key}
           item={item}
           editing={editing}

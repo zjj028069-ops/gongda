@@ -218,8 +218,9 @@ const approver = useRemote<{ approver: boolean }>(objectType ? `/api/audit/appro
   const columns = config.columns.map((column) => {
     if (column.key === 'audit') return { ...column, render: (row: WhRec) => <AuditTag status={String(row.audit_status ?? row.approval ?? 'exempt')} /> };
     if (column.key === 'auditDetail') return { ...column, render: (row: WhRec) => <button type="button" className="kgd-link" onClick={() => setAuditId(String(row.id).split(':')[0])}>查看</button> };
-    if (column.key === 'code' && pathname === '/produce_stock_in_bill/list') {
-      return { ...column, render: (row: WhRec) => <button type="button" className="kgd-link" onClick={() => navigate(`/produce_stock_in_bill/detail/${String(row.id).split(':')[0]}`)}>{String(row.code ?? '')}</button> };
+    if (column.key === 'code' && (pathname === '/produce_stock_in_bill/list' || pathname === '/purchase_stock_in_bill/list')) {
+      const detailBase = pathname === '/purchase_stock_in_bill/list' ? '/purchase_stock_in_bill/detail' : '/produce_stock_in_bill/detail';
+      return { ...column, render: (row: WhRec) => <button type="button" className="kgd-link" onClick={() => navigate(`${detailBase}/${String(row.id).split(':')[0]}`)}>{String(row.code ?? '')}</button> };
     }
     if (column.key === 'actions') return { ...column, render: (row: WhRec) => <span>
       <button type="button" className="kgd-link" onClick={() => printBills([row])}>打印</button>

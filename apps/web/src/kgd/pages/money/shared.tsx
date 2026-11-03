@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, Cascader, DatePicker, Input, Modal, Select, Table, Tooltip } from 'antd';
+import { Button, Cascader, DatePicker, Input, Modal, Select, Switch, Table, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { useRemote } from '../../../masterTools';
 import { useKgd } from '../../context';
@@ -25,6 +25,7 @@ export type Rec = { id: string; [key: string]: any };
 export type DraftLine = {
   key: string; product_id: string; product_name: string; product_code: string; specification: string; unit_name: string; source: string;
   unit_price: string; quantity: string; discount: string; concession: string; note: string; stock: string;
+  category_name: string;
   plan_code: string; plan_name: string; contract_id: string; contract_code: string; supplier_name: string;
 };
 
@@ -38,6 +39,26 @@ export const regions = [
   { value: '四川省', label: '四川省', children: [{ value: '成都市', label: '成都市', children: [{ value: '武侯区', label: '武侯区' }] }] },
 ];
 
+
+const NARROW_MQ = '(max-width: 768px)';
+
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(() => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(NARROW_MQ).matches : false));
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(NARROW_MQ);
+    const onChange = () => setNarrow(mq.matches);
+    onChange();
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+  return narrow;
+}
+
 export function useMoney() {
   const kgd = useKgd();
   const command = useCommand();
@@ -45,7 +66,7 @@ export function useMoney() {
 }
 
 export function blankLine(partial: Record<string, unknown> = {}): DraftLine {
-  return { key: requestKey(), product_id: '', product_name: '', product_code: '', specification: '', unit_name: '', source: '', unit_price: '0', quantity: '1', discount: '10', concession: '0', note: '', stock: '', plan_code: '', plan_name: '', contract_id: '', contract_code: '', supplier_name: '', ...partial } as DraftLine;
+  return { key: requestKey(), product_id: '', product_name: '', product_code: '', specification: '', unit_name: '', source: '', unit_price: '0', quantity: '1', discount: '10', concession: '0', note: '', stock: '', category_name: '', plan_code: '', plan_name: '', contract_id: '', contract_code: '', supplier_name: '', ...partial } as DraftLine;
 }
 
 export function priced(line: DraftLine, formula: string, scale: number) {
@@ -115,17 +136,67 @@ export function openAudit(rows: Rec[]) {
 
 export function ProductPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (rows: Rec[]) => void }) {
   const { onExpired, revision } = useKgd();
+  const narrow = useIsNarrow();
   const [q, setQ] = useState('');
   const [made, setMade] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const products = useRemote<{ items: Rec[] }>(open ? `/api/products?page=1&page_size=100&q=${encodeURIComponent(q)}` : null, revision, onExpired);
   const stock = useRemote<{ items: Rec[] }>(open ? '/api/stock/balances' : null, revision, onExpired);
   const rows = useMemo(() => (products.data?.items ?? []).filter((item) => !made || item.attribute === 'manufactured').map((item) => ({ ...item, id: String(item.id), source: item.attribute === 'purchased' ? '外购' : '自产', stock: sumMoney((stock.data?.items ?? []).filter((row) => String(row.product_id) === String(item.id)).map((row) => String(row.available_qty ?? '0'))) })), [made, products.data, stock.data]);
+  function toggle(id: string) {
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
   function confirm(event?: { stopPropagation?: () => void }) {
     event?.stopPropagation?.();
     onPick(pickByIds(rows, picked));
     setPicked([]);
     onClose();
+  }
+  if (narrow) {
+    return <Modal
+      title="选择商品"
+      open={open}
+      width="100%"
+      wrapClassName="kgd-pick-modal"
+      onCancel={onClose}
+      footer={null}
+      destroyOnHidden
+    >
+      <div className="kgd-pick-body">
+        <div className="kgd-pick-search">
+          <Input allowClear placeholder="搜索商品名 / 编号" value={q} onChange={(event) => setQ(event.target.value)} />
+          <div className="kgd-pick-switch">
+            <span>只看自产</span>
+            <Switch checked={made} onChange={setMade} />
+          </div>
+        </div>
+        <div className="kgd-pick-list">
+          {rows.map((row) => {
+            const on = picked.includes(String(row.id));
+            return (
+              <button type="button" key={row.id} className={`kgd-pick-card${on ? ' on' : ''}`} onClick={() => toggle(String(row.id))}>
+                <span className="kgd-pick-chk" aria-hidden>{on ? '✓' : ''}</span>
+                <span className="kgd-pick-main">
+                  <span className="kgd-pick-name">{row.name || '—'}</span>
+                  <span className="kgd-pick-code">{row.code || ''}</span>
+                  <span className="kgd-pick-meta">
+                    {row.specification ? <span className="pill gray">{String(row.specification)}</span> : null}
+                    {row.category_name ? <span className="pill">{String(row.category_name)}</span> : null}
+                    <span className="stock">库存 {row.stock ?? '0'}</span>
+                    {row.source ? <span className="pill gray">{String(row.source)}</span> : null}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+          {!rows.length ? <div className="kgd-pick-empty">暂无商品</div> : null}
+        </div>
+        <div className="kgd-pick-footer">
+          <span className="sel">已选 <strong>{picked.length}</strong></span>
+          <Button type="primary" className="kgd-pick-ok" onClick={() => confirm()}>确定已选 {picked.length}</Button>
+        </div>
+      </div>
+    </Modal>;
   }
   return <Modal title="选择商品" open={open} width={860} okText="确 定" cancelText="取 消" onCancel={onClose} onOk={confirm}>
     <div className="kgd-toolbar">
@@ -140,13 +211,85 @@ export function ProductPicker({ open, onClose, onPick }: { open: boolean; onClos
 
 export function LineTable({ lines, onChange, formula, scale, tip, extra, mode, addLabel }: { lines: DraftLine[]; onChange: (lines: DraftLine[]) => void; formula: string; scale: number; tip: string; extra?: ReactNode; mode: 'sale' | 'plan' | 'purchase'; addLabel?: string }) {
   const [open, setOpen] = useState(false);
+  const [noteOpenKeys, setNoteOpenKeys] = useState<string[]>([]);
+  const narrow = useIsNarrow();
   function patch(key: string, field: keyof DraftLine, value: string) {
     onChange(lines.map((line) => line.key === key ? { ...line, [field]: value } : line));
   }
   const totals = lines.map((line) => priced(line, formula, scale));
+  const qtyLabel = mode === 'plan' ? '数量' : mode === 'purchase' ? '数量' : '销售数量';
+  const pickLabel = addLabel ?? `+ 选择${mode === 'sale' ? '合同' : '采购'}商品`;
+  const sumQty = sumMoney(lines.map((line) => line.quantity || '0'));
+  const sumAmt = sumMoney(totals.map((item) => item.net || item.amount));
+  const sumErr = totals.find((item) => item.error)?.error;
+
+  if (narrow) {
+    return <div className="kgd-bill-lines">
+      <div className="kgd-bill-tools">
+        <Button type="primary" className="kgd-bill-pick-main" onClick={() => setOpen(true)}>{pickLabel.replace(/^\+\s*/, '＋ ')}</Button>
+        <div className="kgd-bill-tools-row">
+          {extra ? <div className="kgd-bill-tools-extra">{extra}</div> : null}
+          <Button danger className="kgd-bill-clear" disabled={!lines.length} onClick={() => onChange([])}>清空</Button>
+        </div>
+      </div>
+      <div className="kgd-bill-sec">
+        <h3>明细 · {lines.length}</h3>
+        <span className="hint">主列可编 · 次要可折</span>
+      </div>
+      <div className="kgd-bill-card-list">
+        {lines.map((line, index) => {
+          const t = totals[index];
+          const noteOpen = noteOpenKeys.includes(line.key);
+          return (
+            <div className="kgd-bill-line-card" key={line.key}>
+              <div className="kgd-bill-line-top">
+                <span className="kgd-bill-line-idx">{index + 1}</span>
+                <span className="kgd-bill-line-thumb" aria-hidden>图</span>
+                <div className="kgd-bill-line-main">
+                  <div className="kgd-bill-line-name">{line.product_name || '—'}</div>
+                  <div className="kgd-bill-line-code">{line.product_code || ''}</div>
+                </div>
+                <button type="button" className="kgd-bill-line-del" aria-label="删除" onClick={() => onChange(lines.filter((item) => item.key !== line.key))}>×</button>
+              </div>
+              <div className="kgd-bill-line-meta">
+                {line.category_name ? <span className="tag">{line.category_name}</span> : null}
+                {line.specification ? <span className="tag">{line.specification}</span> : null}
+                {line.unit_name ? <span>单位 {line.unit_name}</span> : null}
+                <span>库存 {line.stock || '0'}</span>
+                {mode === 'purchase' && line.plan_code ? <span className="tag">{line.plan_code}</span> : null}
+                {mode === 'purchase' && line.contract_code ? <span className="tag">{line.contract_code}</span> : null}
+              </div>
+              <div className="kgd-bill-edit-row">
+                <label className="kgd-bill-edit-cell"><span>单价</span><Input value={line.unit_price} onChange={(event) => patch(line.key, 'unit_price', event.target.value)} /></label>
+                <label className="kgd-bill-edit-cell"><span>{qtyLabel}</span><Input value={line.quantity} onChange={(event) => patch(line.key, 'quantity', event.target.value)} /></label>
+                <label className="kgd-bill-edit-cell"><span>金额</span><Input className="is-amt" value={t?.amount ?? '0'} disabled /></label>
+              </div>
+              {noteOpen ? (
+                <label className="kgd-bill-note-row"><span>备注</span><Input value={line.note} placeholder="行备注" onChange={(event) => patch(line.key, 'note', event.target.value)} /></label>
+              ) : null}
+              <button
+                type="button"
+                className="kgd-bill-more-toggle"
+                onClick={() => setNoteOpenKeys((prev) => (prev.includes(line.key) ? prev.filter((k) => k !== line.key) : [...prev, line.key]))}
+              >
+                {noteOpen ? '▾ 收起行备注' : '▸ 展开行备注'}
+              </button>
+            </div>
+          );
+        })}
+        {!lines.length ? <div className="kgd-bill-empty">暂无明细，请先选商品</div> : null}
+      </div>
+      <div className="kgd-bill-sum">
+        <span>合计数量 <strong>{sumQty}</strong></span>
+        <span>合计金额 <strong className="amt">¥ {sumAmt}</strong>{sumErr ? `　${sumErr}` : ''}</span>
+      </div>
+      <ProductPicker open={open} onClose={() => setOpen(false)} onPick={(rows) => onChange([...lines, ...rows.map((row) => blankLine({ product_id: row.id, product_name: row.name, product_code: row.code, specification: row.specification, unit_name: row.unit_name, source: row.source, stock: row.stock, category_name: row.category_name ?? '', unit_price: '0' }))])} />
+    </div>;
+  }
+
   return <div>
     <div className="kgd-toolbar">
-      <Button type="primary" onClick={() => setOpen(true)}>{addLabel ?? `+ 选择${mode === 'sale' ? '合同' : '采购'}商品`}</Button>
+      <Button type="primary" onClick={() => setOpen(true)}>{pickLabel}</Button>
       {extra}
       <span className="spacer" style={{ flex: 1 }} />
       <Button danger onClick={() => onChange([])}>清空</Button>
@@ -170,8 +313,8 @@ export function LineTable({ lines, onChange, formula, scale, tip, extra, mode, a
       { title: '备注', render: (_: unknown, row: DraftLine) => <Input value={row.note} onChange={(event) => patch(row.key, 'note', event.target.value)} /> },
       { title: '操作', render: (_: unknown, row: DraftLine) => <button className="kgd-link" onClick={() => onChange(lines.filter((line) => line.key !== row.key))}>删除</button> },
     ]} />
-    <div>合计数量 {sumMoney(lines.map((line) => line.quantity || '0'))}　合计金额 {sumMoney(totals.map((item) => item.net || item.amount))}{totals.some((item) => item.error) ? `　${totals.find((item) => item.error)?.error}` : ''}</div>
-    <ProductPicker open={open} onClose={() => setOpen(false)} onPick={(rows) => onChange([...lines, ...rows.map((row) => blankLine({ product_id: row.id, product_name: row.name, product_code: row.code, specification: row.specification, unit_name: row.unit_name, source: row.source, stock: row.stock, unit_price: '0' }))])} />
+    <div>合计数量 {sumQty}　合计金额 {sumAmt}{sumErr ? `　${sumErr}` : ''}</div>
+    <ProductPicker open={open} onClose={() => setOpen(false)} onPick={(rows) => onChange([...lines, ...rows.map((row) => blankLine({ product_id: row.id, product_name: row.name, product_code: row.code, specification: row.specification, unit_name: row.unit_name, source: row.source, stock: row.stock, category_name: row.category_name ?? '', unit_price: '0' }))])} />
   </div>;
 }
 
