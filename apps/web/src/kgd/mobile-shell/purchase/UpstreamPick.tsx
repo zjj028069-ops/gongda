@@ -55,10 +55,7 @@ function remoteUrl(kind: string): string | null {
   return null;
 }
 
-/**
- * 上游勾选页：左勾、顶已选、右上完成(N)，对齐微信发起群聊。
- * 即使本地库空数据也保留结构（夹具兜底）。
- */
+/** 上游勾选页：左勾、顶已选、右上完成(N) */
 export function PurchaseUpstreamPick() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -75,7 +72,6 @@ export function PurchaseUpstreamPick() {
     if (mapped.length) return mapped;
     return UPSTREAM_FIXTURES[kind] ?? [];
   }, [kind, remote.data]);
-  const fromFixture = !(mapRemote(kind, remote.data).length);
   const [picked, setPicked] = useState<string[]>([]);
 
   function toggle(id: string) {
@@ -113,7 +109,6 @@ export function PurchaseUpstreamPick() {
           完成({picked.length})
         </button>
       </header>
-      {fromFixture && <p className="c3-fixture-hint">本地暂无上游数据 · 展示夹具结构（业务写回不改）</p>}
       <div className="c3-pick-list">
         {options.map((opt) => {
           const on = picked.includes(opt.id);

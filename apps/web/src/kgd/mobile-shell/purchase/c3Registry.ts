@@ -1,6 +1,6 @@
 import type { PlusItem } from '../types';
 
-/** C3 供应/采购叶子定版（临时皮 · 待 Allen 重选） */
+/** C3 供应/采购叶子注册表 */
 export type C3Layout = 'v4-detail' | 'v1-sparse' | 'v4-track' | 'v1-settings';
 
 export type C3UpstreamKind =

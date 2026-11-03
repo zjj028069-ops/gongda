@@ -1,4 +1,4 @@
-/** 空库夹具：只服务 C3 手机皮验收，不写业务库 */
+/** 空库列表兜底数据（不进 UI 文案） */
 
 export type FixtureLine = {
   name: string;

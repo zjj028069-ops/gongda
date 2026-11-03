@@ -111,9 +111,22 @@ for (const [index, leaf] of LEAVES.entries()) {
     if (leaf.key === 'purchase-price') {
       await page.locator('[data-testid="c3-track-banner"]').waitFor();
     }
+    // Allen 硬规矩：叶子页禁止开发说明文案；顶栏仅细线放大镜，禁止标题下长搜索条＋查询
+    const bodyText = await page.locator('[data-testid="c3-purchase-leaf"]').innerText();
+    const banned = ['同源 API', '夹具', '硬约束', '不改业务语义', '临时皮', '待 Allen', 'Allen 已定版', 'PC path', '（皮）', '业务写回'];
+    const hit = banned.find((w) => bodyText.includes(w));
+    if (hit) throw new Error(`叶子页出现违禁开发文案: ${hit}`);
+    if (await page.locator('.c3-fixture-hint, .c3-leaf-foot').count()) {
+      throw new Error('仍残留夹具提示或页脚开发说明');
+    }
+    const longSearch = await page.locator('.c3-search-row, button.c3-query-btn, .c3-leaf > .search-bar').count();
+    if (longSearch) throw new Error('禁止标题下长搜索条＋查询按钮');
+    if (!(await page.locator('[data-testid="c3-leaf-top"] .ms-icon-btn').count())) {
+      throw new Error('顶栏缺少图标按钮（细线放大镜）');
+    }
     await shot(page, `${String(index + 1).padStart(2, '0')}-${leaf.key}`);
     leafPass += 1;
-    return `layout=${layout};plus=${plusCount}`;
+    return `layout=${layout};plus=${plusCount};ui-clean`;
   });
 }
 
@@ -310,7 +323,7 @@ const summary = {
     plus: leaf.plus,
   })),
   results,
-  note: '未 merge、未上腾讯云、未重建库、未改密码、未动 garment；临时皮待 Allen 重选；空数据用夹具',
+  note: '未 merge、未上腾讯云、未重建库、未改密码、未动 garment；UI 已清夹具/开发说明；空数据仍用夹具数据但不进真机文案',
 };
 writeFileSync(path.join(outDir, 'SUMMARY.json'), JSON.stringify(summary, null, 2));
 const md = [

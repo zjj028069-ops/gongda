@@ -6,18 +6,18 @@
 
 | # | 项 | 结果 | 说明 |
 |---|----|------|------|
-| C3-L01 | ≤768 列表 供应商管理 | 通过 | layout=v1-sparse;plus=1 |
-| C3-L02 | ≤768 列表 采购计划 | 通过 | layout=v4-detail;plus=1 |
-| C3-L03 | ≤768 列表 采购单 | 通过 | layout=v4-detail;plus=1 |
-| C3-L04 | ≤768 列表 付款记录 | 通过 | layout=v4-detail;plus=1 |
-| C3-L05 | ≤768 列表 发票管理 | 通过 | layout=v4-detail;plus=1 |
-| C3-L06 | ≤768 列表 采购检验单 | 通过 | layout=v4-detail;plus=1 |
-| C3-L07 | ≤768 列表 采购检验明细 | 通过 | layout=v4-detail;plus=0 |
-| C3-L08 | ≤768 列表 检验规范 | 通过 | layout=v1-sparse;plus=1 |
-| C3-L09 | ≤768 列表 审核设置 | 通过 | layout=v1-sparse;plus=1 |
-| C3-L10 | ≤768 列表 采购设置 | 通过 | layout=v1-settings;plus=0 |
-| C3-L11 | ≤768 列表 供应商设置 | 通过 | layout=v1-settings;plus=0 |
-| C3-L12 | ≤768 列表 采购价格追踪 | 通过 | layout=v4-track;plus=0 |
+| C3-L01 | ≤768 列表 供应商管理 | 通过 | layout=v1-sparse;plus=1;ui-clean |
+| C3-L02 | ≤768 列表 采购计划 | 通过 | layout=v4-detail;plus=1;ui-clean |
+| C3-L03 | ≤768 列表 采购单 | 通过 | layout=v4-detail;plus=1;ui-clean |
+| C3-L04 | ≤768 列表 付款记录 | 通过 | layout=v4-detail;plus=1;ui-clean |
+| C3-L05 | ≤768 列表 发票管理 | 通过 | layout=v4-detail;plus=1;ui-clean |
+| C3-L06 | ≤768 列表 采购检验单 | 通过 | layout=v4-detail;plus=1;ui-clean |
+| C3-L07 | ≤768 列表 采购检验明细 | 通过 | layout=v4-detail;plus=0;ui-clean |
+| C3-L08 | ≤768 列表 检验规范 | 通过 | layout=v1-sparse;plus=1;ui-clean |
+| C3-L09 | ≤768 列表 审核设置 | 通过 | layout=v1-sparse;plus=1;ui-clean |
+| C3-L10 | ≤768 列表 采购设置 | 通过 | layout=v1-settings;plus=0;ui-clean |
+| C3-L11 | ≤768 列表 供应商设置 | 通过 | layout=v1-settings;plus=0;ui-clean |
+| C3-L12 | ≤768 列表 采购价格追踪 | 通过 | layout=v4-track;plus=0;ui-clean |
 | C3-PLUS-ORDER | 采购单＋下拉（加商品三选必留） | 通过 | ＋新增/品选择采购商品/计选择采购计划商品/合选择合同商品 |
 | C3-PLUS-PLAN | 采购计划＋下拉 | 通过 | ＋新建计划/需从需求转入 |
 | C3-PLUS-PAY | 付款＋下拉 | 通过 | ＋登记付款/采关联采购单 |

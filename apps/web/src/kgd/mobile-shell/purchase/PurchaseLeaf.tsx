@@ -40,10 +40,10 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
   useEffect(() => {
     const action = params.get('action');
     if (!action || !leaf) return;
-    if (action === 'scan') setToast('扫码报检入口已保留（皮）');
-    else if (action === 'blank') setToast(`新增入口已打开（皮）· ${leaf.title}`);
-    else if (params.get('upstream')) setToast(`上游已选，进入${leaf.title}（皮）`);
-    else setToast(`${action} · 业务写回后续`);
+    if (action === 'scan') setToast('已打开扫码报检');
+    else if (action === 'blank') setToast(`已打开：${leaf.title}`);
+    else if (params.get('upstream')) setToast(`已选上游，进入${leaf.title}`);
+    else setToast(`已执行：${action}`);
     const next = new URLSearchParams(params);
     next.delete('action');
     next.delete('upstream');
@@ -55,7 +55,6 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
     if (leaf.layout === 'v1-settings') {
       return { items: FIXTURES[leaf.key] ?? [], fromFixture: true };
     }
-    // mt-lines API 需 spec_id，空参时常空 → 夹具保只读主路径结构
     const apiItems = mapApiItems(leaf, remote.data?.items ?? []);
     const reallyFixture = !(remote.data?.items?.length);
     return { items: reallyFixture ? (FIXTURES[leaf.key] ?? apiItems) : apiItems, fromFixture: reallyFixture };
@@ -77,14 +76,13 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
       <div className="ms-leaf" data-testid="c3-leaf-miss">
         <button type="button" className="ms-back" onClick={() => navigate(-1)}>‹ 返回</button>
         <h2>未知采购叶子</h2>
-        <p className="ms-leaf-note">key={leafKey}</p>
       </div>
     );
   }
 
   function onPlusPick(item: PlusItem) {
     if (item.key === 'scan') {
-      setToast('扫码报检入口已保留（皮）');
+      setToast('已打开扫码报检');
       return;
     }
     const up = leaf!.plusUpstream?.[item.key] ?? (item.key === 'from-po' || item.key === 'from-demand' ? leaf!.upstream : undefined);
@@ -92,7 +90,7 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
       navigate(msUpstreamUrl(leaf!, up));
       return;
     }
-    setToast(`${item.label} · 业务写回后续（皮）`);
+    setToast(`已打开：${item.label}`);
   }
 
   return (
@@ -116,9 +114,6 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
         onSearchClose={() => setSearching(false)}
       />
       {toast && <div className="c3-toast" data-testid="c3-toast">{toast}</div>}
-      {fromFixture && leaf.layout !== 'v1-settings' && (
-        <p className="c3-fixture-hint">同源 API 暂无数据 · 使用夹具展示版型（不改业务语义）</p>
-      )}
       {leaf.key === 'purchase-price' && (
         <div className="c3-track-banner" data-testid="c3-track-banner">
           <span className="c3-set-ico" aria-hidden>价</span>
@@ -132,12 +127,6 @@ export function PurchaseLeaf({ leafKey }: { leafKey: string }) {
         {filtered.map((row) => renderC3Card(leaf.layout, leaf.key, row))}
         {!filtered.length && <div className="ms-empty">无匹配记录</div>}
       </div>
-      <p className="c3-leaf-foot">
-        PC path：{leaf.pcPath} · 定版 {leaf.layout}
-        {leaf.plus === null ? ' · 无＋' : ''}
-        {leaf.key === 'mt-lines' ? ' · 只读主路径' : ''}
-        {' · 临时皮待 Allen 重选'}
-      </p>
     </div>
   );
 }

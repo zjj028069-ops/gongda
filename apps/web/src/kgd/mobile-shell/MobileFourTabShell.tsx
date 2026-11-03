@@ -68,7 +68,7 @@ export function MobileFourTabShell() {
     if (item.key === 'add-supplier') {
       const supplier = c3LeafByKey('supplier');
       if (supplier) {
-        navigate(msLeafUrl(supplier, { action: 'blank', toast: '新增供应商入口已打开（皮）' }));
+        navigate(msLeafUrl(supplier, { action: 'blank', toast: '已打开：新增供应商' }));
         return;
       }
       navigate('/ms/leaf?key=supplier&title=' + encodeURIComponent('新增供应商') + '&path=' + encodeURIComponent('/supplier/list'));
