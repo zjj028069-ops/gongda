@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { primaryMenus, type MenuNode, type PrimaryMenu } from '../../menu';
 import { IconChevron } from '../icons';
+import { leafPath, mirroredLeafHref } from '../nav';
 import { L1_ICON_COLORS, glyphOf } from '../types';
 
 function collectLeaves(nodes: MenuNode[]): MenuNode[] {
@@ -29,11 +30,19 @@ export function FunctionsTab() {
   const menus = useMemo(() => primaryMenus, []);
 
   function openLeaf(node: MenuNode, l1: PrimaryMenu) {
-    const title = encodeURIComponent(node.label);
-    const path = encodeURIComponent(node.path || '');
-    const key = encodeURIComponent(node.key);
-    const l1Key = encodeURIComponent(l1.key);
-    navigate(`/ms/leaf?key=${key}&title=${title}&path=${path}&l1=${l1Key}`);
+    const mirrored = mirroredLeafHref(node);
+    if (mirrored) {
+      navigate(mirrored);
+      return;
+    }
+    navigate(
+      leafPath({
+        key: node.key,
+        title: node.label,
+        path: node.path || '',
+        l1: l1.key,
+      }),
+    );
   }
 
   return (
@@ -85,6 +94,8 @@ export function FunctionsTab() {
                         {node.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                         {node.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                         {node.key === 'plan' && <small className="ms-fn-note">生产计划MRP · 物料分析</small>}
+                        {node.key === 'workplace-home' && <small className="ms-fn-note">C0 · 今日要点</small>}
+                        {node.key === 'message-list' && <small className="ms-fn-note">C0 · 消息列表（≠壳消息会话）</small>}
                       </span>
                     </button>
                   );

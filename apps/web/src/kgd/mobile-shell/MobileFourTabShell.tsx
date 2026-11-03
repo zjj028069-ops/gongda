@@ -4,6 +4,9 @@ import { MobileTabBar } from './MobileTabBar';
 import { MobileTopBar } from './MobileTopBar';
 import { LeafPlaceholder } from './LeafPlaceholder';
 import { SearchPage } from './SearchPage';
+import { MobileDeepLinkPage } from './pages/MobileDeepLinkPage';
+import { MobileMessageListPage } from './pages/MobileMessageListPage';
+import { MobileWorkbenchPage } from './pages/MobileWorkbenchPage';
 import { ContactsTab } from './tabs/ContactsTab';
 import { FunctionsTab } from './tabs/FunctionsTab';
 import { MessagesTab } from './tabs/MessagesTab';
@@ -17,11 +20,20 @@ function parseSearchScope(pathname: string): ShellTab | null {
   return (m?.[1] as ShellTab | undefined) ?? null;
 }
 
+function isMirrorLeaf(pathname: string) {
+  return (
+    pathname.startsWith('/ms/leaf')
+    || pathname.startsWith('/ms/staging/area')
+    || pathname.startsWith('/ms/message/list')
+    || pathname.startsWith('/ms/deeplink')
+  );
+}
+
 export function MobileFourTabShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const searchScope = parseSearchScope(location.pathname);
-  const isLeaf = location.pathname.startsWith('/ms/leaf');
+  const isLeaf = isMirrorLeaf(location.pathname);
   const tab = useMemo(() => tabFromPath(location.pathname) ?? 'messages', [location.pathname]);
 
   useEffect(() => {
@@ -56,6 +68,10 @@ export function MobileFourTabShell() {
 
   const showChrome = !isLeaf;
   const title = isLeaf ? undefined : searchScope ? `${TAB_LABEL[searchScope]}搜索` : undefined;
+  const isWorkbench = location.pathname.startsWith('/ms/staging/area');
+  const isMessageList = location.pathname.startsWith('/ms/message/list');
+  const isDeepLink = location.pathname.startsWith('/ms/deeplink');
+  const isGenericLeaf = location.pathname.startsWith('/ms/leaf');
 
   return (
     <div className="ms-shell" data-testid="ms-shell" data-active-tab={searchScope || tab}>
@@ -70,7 +86,10 @@ export function MobileFourTabShell() {
       )}
       <div className={`ms-body ${isLeaf ? 'is-leaf' : ''}`}>
         {searchScope && <SearchPage scope={searchScope} />}
-        {!searchScope && isLeaf && <LeafPlaceholder />}
+        {!searchScope && isWorkbench && <MobileWorkbenchPage />}
+        {!searchScope && isMessageList && <MobileMessageListPage />}
+        {!searchScope && isDeepLink && <MobileDeepLinkPage />}
+        {!searchScope && isGenericLeaf && <LeafPlaceholder />}
         {!searchScope && !isLeaf && tab === 'messages' && <MessagesTab />}
         {!searchScope && !isLeaf && tab === 'contacts' && <ContactsTab />}
         {!searchScope && !isLeaf && tab === 'functions' && <FunctionsTab />}
