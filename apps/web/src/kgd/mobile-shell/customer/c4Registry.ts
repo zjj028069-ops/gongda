@@ -1,6 +1,6 @@
 import type { PlusItem } from '../types';
 
-/** C4 客户管理叶子定版（临时皮 · 待 Allen 重选） */
+/** C4 客户管理叶子定版 */
 export type C4Layout = 'v4-detail' | 'v1-sparse' | 'v4-track' | 'v1-settings';
 
 export type C4UpstreamKind =

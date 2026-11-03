@@ -1,5 +1,6 @@
 /**
  * C4 客户管理手机镜像验收（仅 Playwright）
+ * P0 清夹具：禁字断言（夹具/硬约束/临时皮/（皮）/PC path）不上屏
  * 前置：API 3001 + WEB 5173，.local/dev-credentials.txt
  * 输出：docs/verification/mobile-c4-customer/
  */
@@ -12,6 +13,8 @@ const WEB = process.env.WEB_BASE ?? 'http://127.0.0.1:5173';
 const outDir = path.join(process.cwd(), 'docs/verification/mobile-c4-customer');
 mkdirSync(outDir, { recursive: true });
 const results = [];
+
+const BAN_WORDS = ['夹具', '硬约束', '临时皮', '（皮）', '(皮)', 'PC path', '同源 API', '业务写回', '待 Allen 重选'];
 
 const LEAVES = [
   { key: 'customer-list', title: '客户管理', path: '/customer/list', layout: 'v1-sparse', plus: true },
@@ -83,6 +86,27 @@ function leafUrl(leaf) {
   return `${WEB}/ms/leaf?${q}`;
 }
 
+async function assertNoBanWords(page, where) {
+  const text = await page.locator('body').innerText();
+  const hit = BAN_WORDS.filter((w) => text.includes(w));
+  if (hit.length) throw new Error(`${where} 禁字上屏: ${hit.join(',')}`);
+  const fixtureHint = await page.locator('.c4-fixture-hint').count();
+  const hardHint = await page.locator('.c4-hard-hint').count();
+  const foot = await page.locator('.c4-leaf-foot').count();
+  if (fixtureHint) throw new Error(`${where} 仍有 c4-fixture-hint`);
+  if (hardHint) throw new Error(`${where} 仍有 c4-hard-hint`);
+  if (foot) throw new Error(`${where} 仍有 c4-leaf-foot`);
+}
+
+async function assertTopSearchOnly(page) {
+  const top = page.locator('[data-testid="c4-leaf-top"]');
+  await top.waitFor();
+  const topPlus = await top.locator('[data-testid="c4-plus"]').count();
+  if (topPlus) throw new Error('顶栏不应有＋（仅放大镜）');
+  const search = await top.locator('[data-testid="c4-search"]').count();
+  if (!search) throw new Error('顶栏缺少放大镜');
+}
+
 const session = await login();
 const browser = await chromium.launch({ headless: true });
 
@@ -105,20 +129,33 @@ for (const [index, leaf] of LEAVES.entries()) {
     const layout = await page.locator('[data-testid="c4-customer-leaf"]').getAttribute('data-layout');
     if (layout !== leaf.layout) throw new Error(`layout ${layout} ≠ ${leaf.layout}`);
     await page.locator('[data-testid="c4-list"] [data-testid="c4-card"]').first().waitFor({ timeout: 10000 });
+    await assertTopSearchOnly(page);
     const plusCount = await page.locator('[data-testid="c4-plus"]').count();
-    if (leaf.plus && !plusCount) throw new Error('应有＋');
+    if (leaf.plus && !plusCount) throw new Error('应有 FAB＋');
     if (!leaf.plus && plusCount) throw new Error('设置/追踪不应有业务＋');
     if (leaf.key === 'sales-price') await page.locator('[data-testid="c4-track-banner"]').waitFor();
     if (leaf.key === 'customer-sea') await page.locator('[data-testid="c4-sea-banner"]').waitFor();
-    if (leaf.key === 'quote') await page.locator('[data-testid="c4-hard-quote"]').waitFor();
-    if (leaf.key === 'contract') await page.locator('[data-testid="c4-hard-contract"]').waitFor();
+    await assertNoBanWords(page, leaf.key);
     await shot(page, `${String(index + 1).padStart(2, '0')}-${leaf.key}`);
     leafPass += 1;
-    return `layout=${layout};plus=${plusCount}`;
+    return `layout=${layout};fab=${plusCount}`;
   });
 }
 
-await step('C4-PLUS-QUOTE', '报价＋下拉（新增报价｜从合同复制）', async () => {
+await step('C4-BAN-WORDS', '禁字不上屏（夹具/硬约束/临时皮/皮）', async () => {
+  for (const leaf of [LEAVES.find((x) => x.key === 'quote'), LEAVES.find((x) => x.key === 'contract'), LEAVES.find((x) => x.key === 'customer-list')]) {
+    await page.goto(leafUrl(leaf));
+    await page.locator(`[data-testid="c4-customer-leaf"][data-key="${leaf.key}"]`).waitFor();
+    await assertNoBanWords(page, leaf.key);
+  }
+  await page.goto(`${WEB}/ms/pick?key=contract&kind=quotation&title=${encodeURIComponent('选择上游报价')}&mode=from-quote&scope=c4`);
+  await page.locator('[data-testid="c4-upstream-pick"]').waitFor();
+  await assertNoBanWords(page, 'upstream-quotation');
+  await shot(page, 'ban-words-upstream');
+  return 'clean';
+});
+
+await step('C4-PLUS-QUOTE', '报价 FAB＋（新增报价｜从合同复制）', async () => {
   const leaf = LEAVES.find((x) => x.key === 'quote');
   await page.goto(leafUrl(leaf));
   await page.locator('[data-testid="c4-plus"]').click();
@@ -128,11 +165,12 @@ await step('C4-PLUS-QUOTE', '报价＋下拉（新增报价｜从合同复制）
   if (!joined.includes('新增报价') || !joined.includes('从合同复制')) {
     throw new Error(`报价＋项缺失: ${joined}`);
   }
+  await assertNoBanWords(page, 'plus-quote');
   await shot(page, 'plus-quote');
   return joined;
 });
 
-await step('C4-PLUS-CONTRACT', '合同＋下拉（直接创建｜报价单创建）', async () => {
+await step('C4-PLUS-CONTRACT', '合同 FAB＋（直接创建｜报价单创建）', async () => {
   const leaf = LEAVES.find((x) => x.key === 'contract');
   await page.goto(leafUrl(leaf));
   await page.locator('[data-testid="c4-plus"]').click();
@@ -146,7 +184,7 @@ await step('C4-PLUS-CONTRACT', '合同＋下拉（直接创建｜报价单创建
   return joined;
 });
 
-await step('C4-PLUS-SEA', '公海＋下拉（领取客户｜分配销售）', async () => {
+await step('C4-PLUS-SEA', '公海 FAB＋（领取客户｜分配销售）', async () => {
   const leaf = LEAVES.find((x) => x.key === 'customer-sea');
   await page.goto(leafUrl(leaf));
   await page.locator('[data-testid="c4-plus"]').click();
@@ -164,6 +202,7 @@ await step('C4-PLUS-SEA', '公海＋下拉（领取客户｜分配销售）', as
 await step('C4-UP-QUOTE-COPY', '报价从合同复制 · 上游勾选完成(N)', async () => {
   await page.goto(`${WEB}/ms/pick?key=quote&kind=contract&title=${encodeURIComponent('选择合同订单')}&mode=from-contract&scope=c4`);
   await page.locator('[data-testid="c4-upstream-pick"][data-kind="contract"]').waitFor({ timeout: 20000 });
+  await assertNoBanWords(page, 'up-quote-copy');
   await page.locator('[data-testid="c4-pick-row"]').first().click();
   const selected = await page.locator('[data-testid="c4-pick-selected"]').innerText();
   if (!selected.includes('已选 1')) throw new Error(`已选文案错误: ${selected}`);
@@ -173,13 +212,14 @@ await step('C4-UP-QUOTE-COPY', '报价从合同复制 · 上游勾选完成(N)',
   await shot(page, 'upstream-quote-from-contract');
   await done.click();
   await page.locator('[data-testid="c4-customer-leaf"][data-key="quote"]').waitFor();
+  await assertNoBanWords(page, 'after-up-quote');
   return selected;
 });
 
 await step('C4-UP-CONTRACT-QUOTE', '合同报价单创建上游 · 左勾顶已选右上完成(N)', async () => {
   await page.goto(`${WEB}/ms/pick?key=contract&kind=quotation&title=${encodeURIComponent('选择上游报价')}&mode=from-quote&scope=c4`);
   await page.locator('[data-testid="c4-upstream-pick"][data-kind="quotation"]').waitFor({ timeout: 20000 });
-  await page.locator('[data-testid="c4-quote-upstream-hint"]').waitFor();
+  await assertNoBanWords(page, 'up-contract-quote');
   await page.locator('[data-testid="c4-pick-row"]').first().click();
   await page.locator('[data-testid="c4-pick-row"]').nth(1).click();
   const label = await page.locator('[data-testid="c4-pick-done"]').innerText();
@@ -187,12 +227,14 @@ await step('C4-UP-CONTRACT-QUOTE', '合同报价单创建上游 · 左勾顶已�
   await shot(page, 'upstream-contract-from-quote');
   await page.locator('[data-testid="c4-pick-done"]').click();
   await page.locator('[data-testid="c4-customer-leaf"][data-key="contract"]').waitFor();
+  await assertNoBanWords(page, 'after-up-contract');
   return label;
 });
 
 await step('C4-SEA-CLAIM', '公海领取入口', async () => {
   await page.goto(`${WEB}/ms/pick?key=customer-sea&kind=sea_customer&title=${encodeURIComponent('领取客户')}&mode=claim&scope=c4`);
   await page.locator('[data-testid="c4-upstream-pick"][data-kind="sea_customer"]').waitFor();
+  await assertNoBanWords(page, 'sea-claim');
   await page.locator('[data-testid="c4-pick-row"]').first().click();
   const label = await page.locator('[data-testid="c4-pick-done"]').innerText();
   if (!label.includes('完成(1)')) throw new Error(`完成按钮: ${label}`);
@@ -215,6 +257,10 @@ await step('C4-TREE', '功能树可达客户管理 12 叶子（含报价/合同�
     if (!n) missing.push(leaf.key);
   }
   if (missing.length) throw new Error(`功能树缺少叶子: ${missing.join(',')}`);
+  const treeText = await block.innerText();
+  if (treeText.includes('硬约束') || treeText.includes('手机必留') || treeText.includes('须选上游')) {
+    throw new Error('功能树仍有硬约束标注上屏');
+  }
   await block.locator('.ms-fn-sub', { hasText: '合同报价单' }).first().click();
   await page.locator('[data-testid="c4-customer-leaf"][data-key="quote"]').waitFor();
   await shot(page, 'functions-customer');
@@ -225,6 +271,7 @@ await step('C4-PC-REDIRECT', '窄屏 PC path 重定向 /ms', async () => {
   await page.goto(`${WEB}/customer/list`);
   await page.locator('[data-testid="c4-customer-leaf"][data-key="customer-list"]').waitFor({ timeout: 20000 });
   if (!page.url().includes('/ms/leaf')) throw new Error(`未进 /ms: ${page.url()}`);
+  await assertNoBanWords(page, 'pc-redirect');
   await shot(page, 'pc-redirect-customer');
   return page.url();
 });
@@ -232,14 +279,15 @@ await step('C4-PC-REDIRECT', '窄屏 PC path 重定向 /ms', async () => {
 await step('C4-QUOTE-CONTRACT-SAFE', '报价/合同入口与上游链路未丢', async () => {
   await page.goto(leafUrl(LEAVES.find((x) => x.key === 'quote')));
   await page.locator('[data-testid="c4-customer-leaf"][data-key="quote"]').waitFor();
-  await page.locator('[data-testid="c4-hard-quote"]').waitFor();
   await page.locator('.c4-link', { hasText: '生成合同' }).first().waitFor();
+  await assertNoBanWords(page, 'quote-safe');
   await page.goto(leafUrl(LEAVES.find((x) => x.key === 'contract')));
   await page.locator('[data-testid="c4-customer-leaf"][data-key="contract"]').waitFor();
   await page.locator('[data-testid="c4-plus"]').click();
   await page.locator('[data-testid="c4-plus-panel"]').waitFor();
   await page.locator('.ms-plus-item', { hasText: '报价单创建' }).click();
   await page.locator('[data-testid="c4-upstream-pick"][data-kind="quotation"]').waitFor();
+  await assertNoBanWords(page, 'contract-safe-pick');
   await shot(page, 'quote-contract-safe');
   return 'ok';
 });
@@ -281,7 +329,7 @@ const summary = {
     plus: leaf.plus,
   })),
   results,
-  note: '未 merge、未上腾讯云、未重建库、未改密码、未动 garment；临时皮待 Allen 重选；空数据用夹具；业务写回为皮提示',
+  note: 'P0清夹具：真机无夹具灰字/硬约束蓝条/页脚/皮toast；顶栏仅放大镜、＋为FAB；未 merge、未上腾讯云；定版待 Allen 重选（仅PR说明）',
 };
 writeFileSync(path.join(outDir, 'SUMMARY.json'), JSON.stringify(summary, null, 2));
 const md = [
@@ -299,15 +347,20 @@ const md = [
   '',
   '| 叶子 | key | PC | /ms | 定版 | ＋ |',
   '|------|-----|----|-----|------|---|',
-  ...summary.routes.map((r) => `| ${r.leaf} | ${r.key} | ${r.pc} | /ms/leaf?key=${r.key} | ${r.layout} | ${r.plus ? '有' : '无'} |`),
+  ...summary.routes.map((r) => `| ${r.leaf} | ${r.key} | ${r.pc} | /ms/leaf?key=${r.key} | ${r.layout} | ${r.plus ? 'FAB' : '无'} |`),
+  '',
+  '## P0 清夹具',
+  '',
+  '- 真机无：夹具灰字 / 硬约束蓝条 / 页脚 PC path·临时皮 / （皮）toast',
+  '- 顶栏仅放大镜；＋为 FAB',
+  '- 禁字断言覆盖列表与上游挑选页',
   '',
   '## 已知限制',
   '',
   '- 基线 main v1.0.92；未 rebase/merge PR#3/#4/#5/#6',
-  '- 只改排版/交互皮，不改业务语义/权限/审核流/价格计算',
-  '- 新增/上游完成 → toast 皮提示，不落库（对齐 C2/C3）',
-  '- 空库用夹具；有 API 数据时优先现网',
-  '- 临时定版皮待 Allen 重选',
+  '- 只改排版/交互，不改业务语义/权限/审核流/价格计算',
+  '- 新增/上游完成结构齐，业务写回未接满落库（PR 说明，不上屏）',
+  '- 定版待 Allen 重选（仅 PR，不上屏）',
   '- 未 merge、未上腾讯云、不重建库、不改密码、不动 garment',
 ];
 writeFileSync(path.join(outDir, 'SUMMARY.md'), md.join('\n'));

@@ -271,7 +271,7 @@ export const FIXTURES: Record<string, FixtureRow[]> = {
     }),
     row({
       id: 'au4', code: 'FLOW-FEE', status: 'draft', statusText: '关', date: '',
-      product: '销售费用需审核', subLabel: '符合条件可免审直接入账（皮）', note: '对象：销售费用', active: false,
+      product: '销售费用需审核', subLabel: '新建或修改销售费用时需要审核确认', note: '对象：销售费用', active: false,
     }),
   ],
   'sales-price': [

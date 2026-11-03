@@ -1,6 +1,6 @@
 {
   "version": "SEDRIC01 v1.0.97 mobile-c4-customer",
-  "playwright": "22/22",
+  "playwright": "23/23",
   "leafLists": "12/12",
   "routes": [
     {
@@ -105,89 +105,95 @@
       "n": "C4-L01",
       "title": "≤768 列表 客户管理",
       "result": "通过",
-      "reason": "layout=v1-sparse;plus=1"
+      "reason": "layout=v1-sparse;fab=1"
     },
     {
       "n": "C4-L02",
       "title": "≤768 列表 客户联系人",
       "result": "通过",
-      "reason": "layout=v1-sparse;plus=1"
+      "reason": "layout=v1-sparse;fab=1"
     },
     {
       "n": "C4-L03",
       "title": "≤768 列表 客户跟单",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L04",
       "title": "≤768 列表 合同报价单",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L05",
       "title": "≤768 列表 合同订单",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L06",
       "title": "≤768 列表 收支记录",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L07",
       "title": "≤768 列表 发票管理",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L08",
       "title": "≤768 列表 销售费用",
       "result": "通过",
-      "reason": "layout=v4-detail;plus=1"
+      "reason": "layout=v4-detail;fab=1"
     },
     {
       "n": "C4-L09",
       "title": "≤768 列表 客户公海",
       "result": "通过",
-      "reason": "layout=v1-sparse;plus=1"
+      "reason": "layout=v1-sparse;fab=1"
     },
     {
       "n": "C4-L10",
       "title": "≤768 列表 基础设置",
       "result": "通过",
-      "reason": "layout=v1-settings;plus=0"
+      "reason": "layout=v1-settings;fab=0"
     },
     {
       "n": "C4-L11",
       "title": "≤768 列表 审核设置",
       "result": "通过",
-      "reason": "layout=v1-sparse;plus=1"
+      "reason": "layout=v1-sparse;fab=1"
     },
     {
       "n": "C4-L12",
       "title": "≤768 列表 销售价格追踪",
       "result": "通过",
-      "reason": "layout=v4-track;plus=0"
+      "reason": "layout=v4-track;fab=0"
+    },
+    {
+      "n": "C4-BAN-WORDS",
+      "title": "禁字不上屏（夹具/硬约束/临时皮/皮）",
+      "result": "通过",
+      "reason": "clean"
     },
     {
       "n": "C4-PLUS-QUOTE",
-      "title": "报价＋下拉（新增报价｜从合同复制）",
+      "title": "报价 FAB＋（新增报价｜从合同复制）",
       "result": "通过",
       "reason": "＋新增报价|合从合同复制"
     },
     {
       "n": "C4-PLUS-CONTRACT",
-      "title": "合同＋下拉（直接创建｜报价单创建）",
+      "title": "合同 FAB＋（直接创建｜报价单创建）",
       "result": "通过",
       "reason": "＋直接创建|报报价单创建"
     },
     {
       "n": "C4-PLUS-SEA",
-      "title": "公海＋下拉（领取客户｜分配销售）",
+      "title": "公海 FAB＋（领取客户｜分配销售）",
       "result": "通过",
       "reason": "领领取客户|分分配销售"
     },
@@ -234,5 +240,5 @@
       "reason": "sidebar-ok"
     }
   ],
-  "note": "未 merge、未上腾讯云、未重建库、未改密码、未动 garment；临时皮待 Allen 重选；空数据用夹具；业务写回为皮提示"
+  "note": "P0清夹具：真机无夹具灰字/硬约束蓝条/页脚/皮toast；顶栏仅放大镜、＋为FAB；未 merge、未上腾讯云；定版待 Allen 重选（仅PR说明）"
 }

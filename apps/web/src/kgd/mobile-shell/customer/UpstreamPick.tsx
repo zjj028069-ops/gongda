@@ -96,7 +96,7 @@ function remoteUrl(kind: string): string | null {
   if (kind === 'customer') return '/api/money/customers';
   if (kind === 'linkman') return '/api/crm/contacts';
   if (kind === 'sea_customer') return '/api/crm/sea';
-  if (kind === 'salesperson') return null; // 夹具：现网销售员列表路径不一
+  if (kind === 'salesperson') return null;
   if (kind === 'audit_object') return null;
   return null;
 }
@@ -119,9 +119,9 @@ export function CustomerUpstreamPick() {
   const options = useMemo(() => {
     const mapped = mapRemote(kind, remote.data);
     if (mapped.length) return mapped;
+    // 空库静默结构回退（无夹具灰字上屏）
     return UPSTREAM_FIXTURES[kind] ?? [];
   }, [kind, remote.data]);
-  const fromFixture = !(mapRemote(kind, remote.data).length);
   const [picked, setPicked] = useState<string[]>([]);
 
   function toggle(id: string) {
@@ -134,7 +134,7 @@ export function CustomerUpstreamPick() {
       return;
     }
     const ids = picked.join(',');
-    navigate(msLeafUrl(leaf, { action: mode, upstream: ids, toast: `已选上游 ${picked.length} 项` }));
+    navigate(msLeafUrl(leaf, { action: mode, upstream: ids, toast: `已选 ${picked.length} 项` }));
   }
 
   const selected = options.filter((opt) => picked.includes(opt.id));
@@ -162,12 +162,6 @@ export function CustomerUpstreamPick() {
           完成({picked.length})
         </button>
       </header>
-      {kind === 'quotation' && (
-        <p className="c4-hard-hint" data-testid="c4-quote-upstream-hint">
-          硬约束：仅已审核/不需审核且未建合同的报价可选
-        </p>
-      )}
-      {fromFixture && <p className="c4-fixture-hint">本地暂无上游数据 · 展示夹具结构（业务写回不改）</p>}
       <div className="c4-pick-list">
         {options.map((opt) => {
           const on = picked.includes(opt.id);

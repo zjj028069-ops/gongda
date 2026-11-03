@@ -78,11 +78,7 @@ export function FunctionsTab() {
                             data-leaf-key={leaf.key}
                           >
                             <i className="ms-dot" />
-                            <span>
-                              {leaf.label}
-                              {leaf.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
-                              {leaf.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
-                            </span>
+                            <span>{leaf.label}</span>
                           </button>
                         ))}
                       </div>
@@ -99,8 +95,6 @@ export function FunctionsTab() {
                       <i className="ms-dot" />
                       <span>
                         {node.label}
-                        {node.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
-                        {node.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                         {node.key === 'plan' && <small className="ms-fn-note">生产计划MRP · 物料分析</small>}
                       </span>
                     </button>

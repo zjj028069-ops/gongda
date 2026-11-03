@@ -1,26 +1,27 @@
 # C4 客户管理手机镜像验收
 
 - 版本：SEDRIC01 v1.0.97 mobile-c4-customer
-- Playwright：22/22
+- Playwright：23/23
 - 叶子列表：12/12
 
 | # | 项 | 结果 | 说明 |
 |---|----|------|------|
-| C4-L01 | ≤768 列表 客户管理 | 通过 | layout=v1-sparse;plus=1 |
-| C4-L02 | ≤768 列表 客户联系人 | 通过 | layout=v1-sparse;plus=1 |
-| C4-L03 | ≤768 列表 客户跟单 | 通过 | layout=v4-detail;plus=1 |
-| C4-L04 | ≤768 列表 合同报价单 | 通过 | layout=v4-detail;plus=1 |
-| C4-L05 | ≤768 列表 合同订单 | 通过 | layout=v4-detail;plus=1 |
-| C4-L06 | ≤768 列表 收支记录 | 通过 | layout=v4-detail;plus=1 |
-| C4-L07 | ≤768 列表 发票管理 | 通过 | layout=v4-detail;plus=1 |
-| C4-L08 | ≤768 列表 销售费用 | 通过 | layout=v4-detail;plus=1 |
-| C4-L09 | ≤768 列表 客户公海 | 通过 | layout=v1-sparse;plus=1 |
-| C4-L10 | ≤768 列表 基础设置 | 通过 | layout=v1-settings;plus=0 |
-| C4-L11 | ≤768 列表 审核设置 | 通过 | layout=v1-sparse;plus=1 |
-| C4-L12 | ≤768 列表 销售价格追踪 | 通过 | layout=v4-track;plus=0 |
-| C4-PLUS-QUOTE | 报价＋下拉（新增报价｜从合同复制） | 通过 | ＋新增报价/合从合同复制 |
-| C4-PLUS-CONTRACT | 合同＋下拉（直接创建｜报价单创建） | 通过 | ＋直接创建/报报价单创建 |
-| C4-PLUS-SEA | 公海＋下拉（领取客户｜分配销售） | 通过 | 领领取客户/分分配销售 |
+| C4-L01 | ≤768 列表 客户管理 | 通过 | layout=v1-sparse;fab=1 |
+| C4-L02 | ≤768 列表 客户联系人 | 通过 | layout=v1-sparse;fab=1 |
+| C4-L03 | ≤768 列表 客户跟单 | 通过 | layout=v4-detail;fab=1 |
+| C4-L04 | ≤768 列表 合同报价单 | 通过 | layout=v4-detail;fab=1 |
+| C4-L05 | ≤768 列表 合同订单 | 通过 | layout=v4-detail;fab=1 |
+| C4-L06 | ≤768 列表 收支记录 | 通过 | layout=v4-detail;fab=1 |
+| C4-L07 | ≤768 列表 发票管理 | 通过 | layout=v4-detail;fab=1 |
+| C4-L08 | ≤768 列表 销售费用 | 通过 | layout=v4-detail;fab=1 |
+| C4-L09 | ≤768 列表 客户公海 | 通过 | layout=v1-sparse;fab=1 |
+| C4-L10 | ≤768 列表 基础设置 | 通过 | layout=v1-settings;fab=0 |
+| C4-L11 | ≤768 列表 审核设置 | 通过 | layout=v1-sparse;fab=1 |
+| C4-L12 | ≤768 列表 销售价格追踪 | 通过 | layout=v4-track;fab=0 |
+| C4-BAN-WORDS | 禁字不上屏（夹具/硬约束/临时皮/皮） | 通过 | clean |
+| C4-PLUS-QUOTE | 报价 FAB＋（新增报价｜从合同复制） | 通过 | ＋新增报价/合从合同复制 |
+| C4-PLUS-CONTRACT | 合同 FAB＋（直接创建｜报价单创建） | 通过 | ＋直接创建/报报价单创建 |
+| C4-PLUS-SEA | 公海 FAB＋（领取客户｜分配销售） | 通过 | 领领取客户/分分配销售 |
 | C4-UP-QUOTE-COPY | 报价从合同复制 · 上游勾选完成(N) | 通过 | 已选 1 · HT20261026008 |
 | C4-UP-CONTRACT-QUOTE | 合同报价单创建上游 · 左勾顶已选右上完成(N) | 通过 | 完成(2) |
 | C4-SEA-CLAIM | 公海领取入口 | 通过 | 完成(1) |
@@ -33,24 +34,29 @@
 
 | 叶子 | key | PC | /ms | 定版 | ＋ |
 |------|-----|----|-----|------|---|
-| 客户管理 | customer-list | /customer/list | /ms/leaf?key=customer-list | v1-sparse | 有 |
-| 客户联系人 | linkman | /linkman/list | /ms/leaf?key=linkman | v1-sparse | 有 |
-| 客户跟单 | follow | /follow/list | /ms/leaf?key=follow | v4-detail | 有 |
-| 合同报价单 | quote | /contract_quotation_bill/list | /ms/leaf?key=quote | v4-detail | 有 |
-| 合同订单 | contract | /customer_contract/list | /ms/leaf?key=contract | v4-detail | 有 |
-| 收支记录 | cash | /customer_financier/list | /ms/leaf?key=cash | v4-detail | 有 |
-| 发票管理 | invoice | /customer_invoice/list | /ms/leaf?key=invoice | v4-detail | 有 |
-| 销售费用 | sales-fee | /selling_expenses/list | /ms/leaf?key=sales-fee | v4-detail | 有 |
-| 客户公海 | customer-sea | /customer_sea/list | /ms/leaf?key=customer-sea | v1-sparse | 有 |
+| 客户管理 | customer-list | /customer/list | /ms/leaf?key=customer-list | v1-sparse | FAB |
+| 客户联系人 | linkman | /linkman/list | /ms/leaf?key=linkman | v1-sparse | FAB |
+| 客户跟单 | follow | /follow/list | /ms/leaf?key=follow | v4-detail | FAB |
+| 合同报价单 | quote | /contract_quotation_bill/list | /ms/leaf?key=quote | v4-detail | FAB |
+| 合同订单 | contract | /customer_contract/list | /ms/leaf?key=contract | v4-detail | FAB |
+| 收支记录 | cash | /customer_financier/list | /ms/leaf?key=cash | v4-detail | FAB |
+| 发票管理 | invoice | /customer_invoice/list | /ms/leaf?key=invoice | v4-detail | FAB |
+| 销售费用 | sales-fee | /selling_expenses/list | /ms/leaf?key=sales-fee | v4-detail | FAB |
+| 客户公海 | customer-sea | /customer_sea/list | /ms/leaf?key=customer-sea | v1-sparse | FAB |
 | 基础设置 | customer-base | /customer/setting/base_setting | /ms/leaf?key=customer-base | v1-settings | 无 |
-| 审核设置 | customer-audit | /customer/setting/audit_setting | /ms/leaf?key=customer-audit | v1-sparse | 有 |
+| 审核设置 | customer-audit | /customer/setting/audit_setting | /ms/leaf?key=customer-audit | v1-sparse | FAB |
 | 销售价格追踪 | sales-price | /customer/salesPriceTrack | /ms/leaf?key=sales-price | v4-track | 无 |
+
+## P0 清夹具
+
+- 真机无：夹具灰字 / 硬约束蓝条 / 页脚 PC path·临时皮 / （皮）toast
+- 顶栏仅放大镜；＋为 FAB
+- 禁字断言覆盖列表与上游挑选页
 
 ## 已知限制
 
 - 基线 main v1.0.92；未 rebase/merge PR#3/#4/#5/#6
-- 只改排版/交互皮，不改业务语义/权限/审核流/价格计算
-- 新增/上游完成 → toast 皮提示，不落库（对齐 C2/C3）
-- 空库用夹具；有 API 数据时优先现网
-- 临时定版皮待 Allen 重选
+- 只改排版/交互，不改业务语义/权限/审核流/价格计算
+- 新增/上游完成结构齐，业务写回未接满落库（PR 说明，不上屏）
+- 定版待 Allen 重选（仅 PR，不上屏）
 - 未 merge、未上腾讯云、不重建库、不改密码、不动 garment

@@ -56,7 +56,7 @@ export function MobileFourTabShell() {
     if (item.reserved === 'quote') {
       const quote = c4LeafByKey('quote');
       if (quote) {
-        navigate(msLeafUrl(quote, { action: 'blank', toast: '新增报价入口已打开（皮）' }));
+        navigate(msLeafUrl(quote, { action: 'blank' }));
         return;
       }
     }
@@ -74,7 +74,7 @@ export function MobileFourTabShell() {
     if (item.key === 'add-customer') {
       const customer = c4LeafByKey('customer-list');
       if (customer) {
-        navigate(msLeafUrl(customer, { action: 'blank', toast: '新增客户入口已打开（皮）' }));
+        navigate(msLeafUrl(customer, { action: 'blank' }));
         return;
       }
       navigate('/ms/leaf?key=customer-list&title=' + encodeURIComponent('新增客户') + '&path=' + encodeURIComponent('/customer/list') + '&l1=customer');
