@@ -31,6 +31,8 @@ export type PlusItem = {
   label: string;
   /** 占位说明或后续路由 */
   hint?: string;
+  /** 气泡内小图标，缺省按 key 推断 */
+  glyph?: string;
   /** 硬约束：报价/合同上游入口 */
   reserved?: 'quote' | 'contract-from-quote';
 };

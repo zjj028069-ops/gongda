@@ -1,9 +1,9 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.92",
-  "display": "SEDRIC01 v1.0.92",
-  "feature": "mobile-4tab-shell-p0",
-  "hotfix": "20261103-mobile-4tab-shell-p0",
+  "version": "1.0.94",
+  "display": "SEDRIC01 v1.0.94",
+  "feature": "mobile-c1-produce-core",
+  "hotfix": "20261103-mobile-c1-produce-core",
   "primary": "#4184F4",
-  "note": "mobile-4tab-shell-p0 on baseline v1.0.91; old v1.0.75 void"
+  "note": "mobile-c1-produce-core on baseline v1.0.92 mobile-4tab-shell-p0; C0/PR#3 not used as baseline"
 }
