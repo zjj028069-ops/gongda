@@ -1,0 +1,173 @@
+{
+  "version": "SEDRIC01 v1.0.107 / mobile-c6-lean-maint-skin-final",
+  "baseline": "v1.0.106",
+  "total": 27,
+  "passed": 27,
+  "leafPass": 17,
+  "leafTotal": 17,
+  "results": [
+    {
+      "n": "C6F-L01",
+      "title": "≤768 维保计划",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L02",
+      "title": "≤768 维保任务",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L03",
+      "title": "≤768 维保记录",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L04",
+      "title": "≤768 维保明细",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L05",
+      "title": "≤768 维保内容",
+      "result": "通过",
+      "reason": "layout=v5-switch-rows;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L06",
+      "title": "≤768 点检计划",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L07",
+      "title": "≤768 点检记录",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=1"
+    },
+    {
+      "n": "C6F-L08",
+      "title": "≤768 维修工单",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=1"
+    },
+    {
+      "n": "C6F-L09",
+      "title": "≤768 设备档案",
+      "result": "通过",
+      "reason": "layout=v4-detail-lines;plus=1;locked=1"
+    },
+    {
+      "n": "C6F-L10",
+      "title": "≤768 设备二维码",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=1"
+    },
+    {
+      "n": "C6F-L11",
+      "title": "≤768 维保设置",
+      "result": "通过",
+      "reason": "layout=v5-switch-rows;plus=0;locked=0"
+    },
+    {
+      "n": "C6F-L12",
+      "title": "≤768 精益生产工作站",
+      "result": "通过",
+      "reason": "layout=v2-kpi;plus=0;locked=0"
+    },
+    {
+      "n": "C6F-L13",
+      "title": "≤768 整改中心",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L14",
+      "title": "≤768 精益会议",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L15",
+      "title": "≤768 会议待办",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L16",
+      "title": "≤768 现场巡查",
+      "result": "通过",
+      "reason": "layout=v3-status-tabs;plus=1;locked=0"
+    },
+    {
+      "n": "C6F-L17",
+      "title": "≤768 精益生产设置",
+      "result": "通过",
+      "reason": "layout=v5-switch-rows;plus=0;locked=0"
+    },
+    {
+      "n": "C6F-PLUS",
+      "title": "整改中心＋气泡贴在加号下方",
+      "result": "通过",
+      "reason": "＋新增整改"
+    },
+    {
+      "n": "C6F-TABS",
+      "title": "整改中心状态 Tab 过滤待整改",
+      "result": "通过",
+      "reason": "all=6;wait=3"
+    },
+    {
+      "n": "C6F-TASK-TABS",
+      "title": "维保任务状态 Tab 过滤执行中",
+      "result": "通过",
+      "reason": "doing-only"
+    },
+    {
+      "n": "C6F-RECORD",
+      "title": "维保记录对齐点检记录版3行卡",
+      "result": "通过",
+      "reason": "record=v3;pi-record=v3"
+    },
+    {
+      "n": "C6F-LOCKED",
+      "title": "已定四叶不退版",
+      "result": "通过",
+      "reason": "device-archive=v4-detail-lines;pi-record=v3-status-tabs;repair-order=v3-status-tabs;device-qr=v3-status-tabs"
+    },
+    {
+      "n": "C6F-SWITCH",
+      "title": "精益设置开关 toast",
+      "result": "通过",
+      "reason": "true->false 已关闭：生产计划管理"
+    },
+    {
+      "n": "C6F-UPSTREAM",
+      "title": "维保任务＋派工 → 完成(N)",
+      "result": "通过",
+      "reason": "完成(1) 已选 1 项：注塑机周检计划"
+    },
+    {
+      "n": "C6F-FN",
+      "title": "功能树设备维保 11 + 精益 6",
+      "result": "通过",
+      "reason": "device-11+lean-6"
+    },
+    {
+      "n": "C6F-PC",
+      "title": "窄屏 PC path → /ms/leaf",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/leaf?key=device-archive&title=%E8%AE%BE%E5%A4%87%E6%A1%A3%E6%A1%88&path=%2Fdevice%2Flist&l1=device"
+    },
+    {
+      "n": "C6F-DESKTOP",
+      "title": "≥769 不挂四栏壳",
+      "result": "通过",
+      "reason": "shell=0;sidebar=1"
+    }
+  ],
+  "note": "未 merge、未上腾讯云、未重建库、未改密码"
+}
