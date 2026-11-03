@@ -16,6 +16,8 @@ import { QrImage } from './qr';
 import { AiShell } from '../modules/ai/AiShell';
 import { mesAbsPath } from '../mesBase';
 import { AppearanceSwitcher, applyStoredAppearance } from './appearance';
+import { MobileFourTabShell } from './mobile-shell/MobileFourTabShell';
+import { useIsNarrow } from './mobile-shell/useIsNarrow';
 
 function PrimaryIcon({ name }: { name: string }) {
   const props = { className: 'kgd-sidebar-ico', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const };
@@ -198,6 +200,8 @@ export function Shell() {
   const { session, onLogout, logoutBusy, revision, onExpired } = useKgd();
   const navigate = useNavigate();
   const location = useLocation();
+  /** ≤768：微信式四栏壳；≥769：原 PC 侧栏壳不动 */
+  const narrow = useIsNarrow(768);
   const [collapsed, setCollapsed] = useState(false);
   /** ≤768：侧栏改抽屉，与桌面 collapsed(64px 轨)解耦；≥769 不读此状态 */
   const [isNarrow, setIsNarrow] = useState(false);
@@ -368,6 +372,7 @@ export function Shell() {
   const specTail = specForPath(location.pathname)?.breadcrumb_tail;
   const tail = specTail ?? crumbTail(location.pathname, current?.primary.key);
   if (tail && crumb[crumb.length - 1] !== tail) crumb.push(tail);
+<<<<<<< HEAD
   const desktopCollapsed = !isNarrow && collapsed;
   const showSidebarText = isNarrow || !collapsed;
   return <div className={`kgd-app${isNarrow ? ' is-narrow' : ''}${isNarrow && mobileNavOpen ? ' is-mobile-nav-open' : ''}`}>
@@ -379,6 +384,11 @@ export function Shell() {
       aria-label="主导航"
       aria-hidden={isNarrow && !mobileNavOpen ? true : undefined}
     >
+=======
+  if (narrow) return <MobileFourTabShell />;
+  return <div className="kgd-app">
+    <aside className={`kgd-sidebar ${collapsed ? 'is-collapsed' : ''}`} aria-label="主导航">
+>>>>>>> 80708b1 (feat(web): 阶段B 手机壳四栏骨架 P0（mobile-4tab-shell-p0）)
       <div className="kgd-sidebar-brand" title={brand}>
         {logo ? <img src={logo} alt="" /> : <i>赛</i>}
         {showSidebarText && <span className="kgd-sidebar-brand-text">{brand}</span>}
