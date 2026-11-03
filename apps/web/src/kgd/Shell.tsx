@@ -372,7 +372,8 @@ export function Shell() {
   const specTail = specForPath(location.pathname)?.breadcrumb_tail;
   const tail = specTail ?? crumbTail(location.pathname, current?.primary.key);
   if (tail && crumb[crumb.length - 1] !== tail) crumb.push(tail);
-<<<<<<< HEAD
+  /** ≤768：微信式四栏壳（替换基线侧栏抽屉热修）；≥769：保留现网 PC 侧栏 */
+  if (narrow) return <MobileFourTabShell />;
   const desktopCollapsed = !isNarrow && collapsed;
   const showSidebarText = isNarrow || !collapsed;
   return <div className={`kgd-app${isNarrow ? ' is-narrow' : ''}${isNarrow && mobileNavOpen ? ' is-mobile-nav-open' : ''}`}>
@@ -384,11 +385,6 @@ export function Shell() {
       aria-label="主导航"
       aria-hidden={isNarrow && !mobileNavOpen ? true : undefined}
     >
-=======
-  if (narrow) return <MobileFourTabShell />;
-  return <div className="kgd-app">
-    <aside className={`kgd-sidebar ${collapsed ? 'is-collapsed' : ''}`} aria-label="主导航">
->>>>>>> 80708b1 (feat(web): 阶段B 手机壳四栏骨架 P0（mobile-4tab-shell-p0）)
       <div className="kgd-sidebar-brand" title={brand}>
         {logo ? <img src={logo} alt="" /> : <i>赛</i>}
         {showSidebarText && <span className="kgd-sidebar-brand-text">{brand}</span>}

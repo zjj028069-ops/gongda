@@ -1,31 +1,20 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.91",
-  "display": "SEDRIC01 v1.0.91",
-  "feature": "list-header-filter-unify",
-  "hotfix": "20261031-list-header-filter-v191",
+  "version": "1.0.92",
+  "display": "SEDRIC01 v1.0.92",
+  "feature": "mobile-4tab-shell-p0",
+  "hotfix": "20261103-mobile-4tab-shell-p0",
   "primary": "#4184F4",
-  "released_at": "2026-10-31T14:28:46+08:00",
+  "released_at": "2026-11-03T14:55:00+08:00",
   "features": [
-    "公共 ListFrame 默认启用表头筛选：标题+蓝漏斗（FilterOutlined）；筛中态抬起白胶囊显示已选值（方案B/natural-v3）",
-    "各业务列表（客户/加工单/仓库单等）继承，无需逐页硬改；headerFilter:false 或 actions 列可关闭",
-    "商品列表原有显式 headerFilter/valueOf 保留；CSS/HeaderFilter 组件不变",
-    "≤768 手机卡片路径不改；PC 宽屏为主",
-    "热修上云；不重建库、不改密码、不开云端 Cursor；与 Garment 无关"
+    "阶段 B 手机壳骨架 P0：≤768 微信式四栏（消息｜联系人｜功能｜设置），主色 #4184F4",
+    "顶栏细线放大镜+圆圈＋；搜索分栏不串台；联系人四类纵向；功能对齐 primaryMenus 15 一级",
+    "报价合同/销售合同上游报价入口在功能树与＋菜单保留；≥769 保留现网 PC 侧栏",
+    "已 rebase 至 v1.0.91 现网源码基线（ca009a2）；旧 v1.0.75 标号作废"
   ],
-  "note": "hotfix list-header-filter-unify；VPS 备份 .bak-*-list-header-filter-v191",
-  "prev": "1.0.90 fluent-chitchat-guard",
-  "tag": "list-header-filter-unify",
-  "dist_js": "index-BqFMGIGc.js",
-  "dist_css": "index-Cw_vdb1_.css",
-  "web": {
-    "files": [
-      "apps/web/src/kgd/ListFrame.tsx",
-      "apps/web/src/kgd/HeaderFilter.tsx",
-      "apps/web/src/kgd/kgd.css",
-      "apps/web/dist/index.html",
-      "apps/web/dist/assets/index-BqFMGIGc.js",
-      "apps/web/dist/assets/index-Cw_vdb1_.css"
-    ]
-  }
+  "note": "基线=v1.0.91 list-header-filter-unify；本功能=v1.0.92 mobile-4tab-shell-p0；不重建库、不改密码、不上云待 Allen 点头；与 Garment 无关",
+  "prev": "1.0.91 list-header-filter-unify",
+  "tag": "mobile-4tab-shell-p0",
+  "baseline": "1.0.91",
+  "baseline_commit": "ca009a221f149fcb5487527b04fc5780a8e71e02"
 }
