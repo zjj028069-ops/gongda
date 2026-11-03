@@ -47,12 +47,6 @@
   outline: none;
 }
 
-.c2-fixture-hint {
-  margin: 8px 14px 0;
-  font-size: 12px;
-  color: #8a8a8a;
-}
-
 .c2-toast {
   margin: 8px 14px 0;
   padding: 10px 12px;
@@ -448,12 +442,6 @@
 }
 
 .c2-taking-name .c2-thumb { width: 24px; height: 24px; font-size: 11px; }
-
-.c2-leaf-foot {
-  margin: 4px 14px 0;
-  font-size: 11px;
-  color: #9aa3af;
-}
 
 /* 上游选单 · 微信发起群聊皮 */
 .c2-pick {

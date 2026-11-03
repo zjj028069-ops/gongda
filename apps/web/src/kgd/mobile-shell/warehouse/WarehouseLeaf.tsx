@@ -50,10 +50,10 @@ export function WarehouseLeaf({ leafKey }: { leafKey: string }) {
   useEffect(() => {
     const action = params.get('action');
     if (!action || !leaf) return;
-    if (action === 'scan') setToast('扫码入口已保留（皮）');
-    else if (action === 'blank' || action === 'direct') setToast(`空白新增入口已打开（皮）· ${leaf.title}`);
-    else if (params.get('upstream')) setToast(`上游已选，进入${leaf.title}新增（皮）`);
-    else setToast(`${action} · 业务写回后续`);
+    if (action === 'scan') setToast('扫码');
+    else if (action === 'blank' || action === 'direct') setToast('已打开新增');
+    else if (params.get('upstream')) setToast(`已选上游 · ${leaf.title}`);
+    else setToast('已处理');
     const next = new URLSearchParams(params);
     next.delete('action');
     next.delete('upstream');
@@ -101,7 +101,7 @@ export function WarehouseLeaf({ leafKey }: { leafKey: string }) {
 
   function onPlusPick(item: PlusItem) {
     if (item.key === 'scan') {
-      setToast('扫码入口已保留（皮）');
+      setToast('扫码');
       return;
     }
     const needsUpstream =
@@ -115,7 +115,7 @@ export function WarehouseLeaf({ leafKey }: { leafKey: string }) {
       navigate(msUpstreamUrl(leaf!));
       return;
     }
-    setToast(`${item.label} · 业务写回后续（皮）`);
+    setToast(item.label);
   }
 
   return (
@@ -133,7 +133,6 @@ export function WarehouseLeaf({ leafKey }: { leafKey: string }) {
         onSearchClose={() => setSearching(false)}
       />
       {toast && <div className="c2-toast" data-testid="c2-toast">{toast}</div>}
-      {fromFixture && <p className="c2-fixture-hint">同源 API 暂无数据 · 使用夹具展示版型（不改库存算法）</p>}
       {leaf.alarmCapsules && (
         <div className="c2-capsules" data-testid="c2-alarm-capsules" role="tablist" aria-label="库存报警筛选">
           {ALARM_CAPS.map((cap) => (
@@ -160,7 +159,6 @@ export function WarehouseLeaf({ leafKey }: { leafKey: string }) {
         {filtered.map((row) => renderC2Card(leaf.layout, leaf.key, row))}
         {!filtered.length && <div className="ms-empty">无匹配记录</div>}
       </div>
-      <p className="c2-leaf-foot">PC path：{leaf.pcPath} · 定版 {leaf.layout}{leaf.plus === null ? ' · 无＋' : ''}</p>
     </div>
   );
 }

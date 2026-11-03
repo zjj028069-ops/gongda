@@ -86,7 +86,6 @@ export function UpstreamPick() {
     if (mapped.length) return mapped;
     return UPSTREAM_FIXTURES[kind] ?? [];
   }, [kind, remote.data]);
-  const fromFixture = !(mapRemote(kind, remote.data).length);
   const [picked, setPicked] = useState<string[]>([]);
 
   function toggle(id: string) {
@@ -124,7 +123,6 @@ export function UpstreamPick() {
           完成({picked.length})
         </button>
       </header>
-      {fromFixture && <p className="c2-fixture-hint">本地暂无上游数据 · 展示夹具结构（业务写回不改）</p>}
       <div className="c2-pick-list">
         {options.map((opt) => {
           const on = picked.includes(opt.id);

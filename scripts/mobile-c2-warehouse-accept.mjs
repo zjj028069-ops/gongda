@@ -86,6 +86,35 @@ function leafUrl(leaf) {
   return `${WEB}/ms/leaf?${q}`;
 }
 
+/** Allen P0：禁止把开发/夹具/硬约束/PC path 文案画进真机页 */
+const FORBIDDEN_UI = [
+  '同源 API',
+  '使用夹具',
+  '夹具展示',
+  '夹具结构',
+  '暂无上游数据',
+  '硬约束',
+  '临时皮',
+  'PC path',
+  '定版',
+  '（皮）',
+  '(皮)',
+  '业务写回后续',
+  '业务写回不改',
+  '不改库存算法',
+  'c2-fixture-hint',
+];
+
+async function assertCleanUi(page, where) {
+  const body = await page.locator('body').innerText();
+  for (const bad of FORBIDDEN_UI) {
+    if (body.includes(bad)) throw new Error(`${where} 出现禁文案「${bad}」`);
+  }
+  if (await page.locator('.c2-fixture-hint, .c2-leaf-foot').count()) {
+    throw new Error(`${where} 仍有夹具横幅或开发页脚`);
+  }
+}
+
 const session = await login();
 const browser = await chromium.launch({ headless: true });
 
@@ -124,6 +153,7 @@ for (const [index, leaf] of LEAVES.entries()) {
       const text = await page.locator('[data-testid="c2-list"]').innerText();
       if (!text.includes('领料数') || !text.includes('退料数')) throw new Error('退料卡缺领料/退料数');
     }
+    await assertCleanUi(page, leaf.key);
     await shot(page, `${String(index + 1).padStart(2, '0')}-${leaf.key}`);
     leafPass += 1;
     return `layout=${layout};plus=${plusCount}`;
@@ -140,6 +170,7 @@ await step('C2-PLUS-SEMI', '半成品入库＋下拉', async () => {
   if (!joined.includes('从加工单入库') || !joined.includes('新增') || !joined.includes('扫码')) {
     throw new Error(`半成品＋项缺失: ${joined}`);
   }
+  await assertCleanUi(page, 'plus-in-semi');
   await shot(page, 'plus-in-semi');
   return joined;
 });
@@ -154,6 +185,7 @@ await step('C2-PLUS-PURCHASE', '采购入库＋下拉', async () => {
   if (!joined.includes('空白新增') || !joined.includes('从采购单入库') || !joined.includes('扫码')) {
     throw new Error(`采购＋项缺失: ${joined}`);
   }
+  await assertCleanUi(page, 'plus-in-purchase');
   await shot(page, 'plus-in-purchase');
   return joined;
 });
@@ -168,6 +200,7 @@ await step('C2-PLUS-SALE', '销售出库＋下拉（合同出库必留）', asyn
   if (!joined.includes('合同出库') || !joined.includes('空白新增') || !joined.includes('扫码')) {
     throw new Error(`销售出库＋项缺失: ${joined}`);
   }
+  await assertCleanUi(page, 'plus-out-sale');
   await shot(page, 'plus-out-sale');
   return joined;
 });
@@ -181,9 +214,11 @@ await step('C2-UP-SEMI', '半成品上游选单 · 左勾顶已选右上完成(N
   const done = page.locator('[data-testid="c2-pick-done"]');
   const label = await done.innerText();
   if (!label.includes('完成(1)')) throw new Error(`完成按钮: ${label}`);
+  await assertCleanUi(page, 'upstream-semi');
   await shot(page, 'upstream-semi');
   await done.click();
   await page.locator('[data-testid="c2-warehouse-leaf"][data-key="in-semi"]').waitFor();
+  await assertCleanUi(page, 'upstream-semi-done');
   return selected;
 });
 
@@ -194,6 +229,7 @@ await step('C2-UP-PURCHASE', '采购入库上游选单', async () => {
   await page.locator('[data-testid="c2-pick-row"]').nth(1).click();
   const label = await page.locator('[data-testid="c2-pick-done"]').innerText();
   if (!label.includes('完成(2)')) throw new Error(`完成按钮: ${label}`);
+  await assertCleanUi(page, 'upstream-purchase');
   await shot(page, 'upstream-purchase');
   return label;
 });
@@ -204,6 +240,7 @@ await step('C2-UP-SALE', '销售出库合同上游选单', async () => {
   await page.locator('[data-testid="c2-pick-row"]').first().click();
   const label = await page.locator('[data-testid="c2-pick-done"]').innerText();
   if (!label.includes('完成(1)')) throw new Error(`完成按钮: ${label}`);
+  await assertCleanUi(page, 'upstream-sale-contract');
   await shot(page, 'upstream-sale-contract');
   return label;
 });
