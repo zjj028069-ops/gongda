@@ -55,20 +55,6 @@
   cursor: pointer;
 }
 
-.c5-fixture-hint,
-.c5-hard-hint {
-  margin: 8px 14px 0;
-  font-size: 12px;
-  color: #8a8a8a;
-}
-
-.c5-hard-hint {
-  color: #3a6fd8;
-  background: #eaf1ff;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
 .c5-toast {
   margin: 8px 14px 0;
   padding: 10px 12px;
@@ -141,78 +127,6 @@
 .c5-seg-item.is-on {
   background: var(--c5-accent);
   color: #fff;
-}
-
-.c5-search-row {
-  display: flex;
-  gap: 8px;
-  padding: 10px 14px 0;
-  align-items: center;
-}
-
-.c5-search-box {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  border: 1px solid #e3e6ec;
-  border-radius: 10px;
-  padding: 0 10px;
-  height: 38px;
-}
-
-.c5-search-box.grow { flex: 1; }
-
-.c5-search-box input {
-  flex: 1;
-  border: 0;
-  outline: none;
-  font-size: 14px;
-  background: transparent;
-}
-
-.c5-query-btn {
-  border: 0;
-  background: var(--c5-accent);
-  color: #fff;
-  border-radius: 10px;
-  height: 38px;
-  padding: 0 14px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.c5-filter-ico {
-  width: 38px;
-  height: 38px;
-  border: 1px solid #e3e6ec;
-  border-radius: 10px;
-  background: #fff;
-  cursor: pointer;
-}
-
-.c5-capsules {
-  display: flex;
-  gap: 8px;
-  padding: 10px 14px 0;
-  overflow-x: auto;
-}
-
-.c5-capsule {
-  border: 0;
-  background: #e8ebf0;
-  color: #555;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.c5-capsule.is-on {
-  background: #d7e6ff;
-  color: var(--c5-accent);
 }
 
 .c5-list {
@@ -738,27 +652,11 @@
   cursor: pointer;
 }
 
-.c5-leaf-foot {
-  margin: 4px 14px 0;
-  font-size: 11px;
-  color: #9aa0a8;
-}
-
 /* 新增直进表单 */
 .c5-create {
   min-height: 100%;
   background: #f2f4f8;
   padding-bottom: 24px;
-}
-
-.c5-create-banner {
-  margin: 10px 14px 0;
-  padding: 10px 12px;
-  background: #eaf1ff;
-  color: #3a6fd8;
-  border-radius: 10px;
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .c5-form-card {

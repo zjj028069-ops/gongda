@@ -18,7 +18,7 @@
 | C5-NO-DEV-COPY | 全叶子无夹具/硬约束/同源API 文案且无长搜索条 | 通过 | goods-list,bom,goods-base,machine,process,post,route,extra |
 | C5-PLUS-GOODS | 商品＋下拉仅「新增商品｜扫码新增」无模板 | 通过 | ＋新增商品/扫扫码新增 |
 | C5-GOODS-SEARCH-ICON | 商品列表点顶栏放大镜进入搜索态（无标题下长条） | 通过 | top-magnifier-ok |
-| C5-GOODS-CREATE | 商品新增直进详情表单（无模板） | 通过 | 空白新建商品，直接填写基础信息与库存预警 |
+| C5-GOODS-CREATE | 商品新增直进详情表单（无模板、无蓝横幅） | 通过 | create-form-no-banner |
 | C5-PLUS-BOM | BOM＋下拉（新增BOM｜扫码） | 通过 | ＋新增BOM/扫扫码 |
 | C5-BOM-UPSTREAM | BOM 新增关联商品 · 上游勾选完成(N) | 通过 | 已选 1 · 液压电磁换向阀组件 |
 | C5-ROUTE-CHAIN | 工艺路线每卡迷你步骤链可见连线 | 通过 | cards=2 |

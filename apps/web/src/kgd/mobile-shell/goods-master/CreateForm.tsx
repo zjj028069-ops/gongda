@@ -8,7 +8,7 @@ type Props = {
   linkedGoods?: string;
 };
 
-/** 新增直进表单（无模板）· 皮层，不落库 */
+/** 新增直进表单（无模板）；本波不落库，仅交互皮 */
 export function CreateForm({ kind, title, onCancel, onSave, linkedGoods }: Props) {
   const [name, setName] = useState(kind === 'goods' ? '深沟球轴承 6205-2RS' : '');
   const [code, setCode] = useState('');
@@ -31,12 +31,6 @@ export function CreateForm({ kind, title, onCancel, onSave, linkedGoods }: Props
         <h1 className="ms-top-title c5-leaf-title">{title}</h1>
         <button type="button" className="c5-top-cancel" onClick={onCancel}>取消</button>
       </header>
-
-      <div className="c5-create-banner" data-testid="c5-create-banner">
-        {kind === 'goods'
-          ? '空白新建商品，直接填写基础信息与库存预警'
-          : '空白新建 BOM，可关联商品后填写明细'}
-      </div>
 
       {kind === 'goods' ? (
         <>

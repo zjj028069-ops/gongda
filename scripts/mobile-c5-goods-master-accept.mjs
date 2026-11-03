@@ -15,7 +15,11 @@ const outDir = path.join(process.cwd(), 'docs/verification/mobile-c5-goods-maste
 mkdirSync(outDir, { recursive: true });
 const results = [];
 
-const FORBIDDEN = ['夹具', '硬约束', '同源 API', '同源API', '展示版型', '不改业务语义'];
+const FORBIDDEN = [
+  '夹具', '硬约束', '同源 API', '同源API', '展示版型', '不改业务语义',
+  '对齐快工单', '（皮）', '(皮)', 'PC path', '定版', 'C5 生产资料皮', 'C5皮',
+  '使用夹具', '业务写回后续', '验收话术',
+];
 
 const LEAVES = [
   { key: 'goods-list', title: '商品列表', path: '/goods/list', layout: 'v3-category-tabs', plus: true, l1: 'goods' },
@@ -91,12 +95,15 @@ async function assertCleanUi(page, scope = '[data-testid="c5-goods-leaf"]') {
   for (const bad of FORBIDDEN) {
     if (text.includes(bad)) throw new Error(`页面出现禁止文案「${bad}」`);
   }
-  // 标题下长搜索条＋查询（双搜索）禁止
-  const longSearch = await page.locator('.c5-search-row, .c5-query-btn, [data-testid="c5-goods-capsules"]').count();
-  if (longSearch) throw new Error('禁止标题下长搜索条/查询按钮/挤死列表的胶囊筛');
-  // 非搜索态时顶栏应有放大镜图标按钮
+  // 标题下长搜索条＋查询（双搜索）禁止；create 蓝横幅禁止
+  const bannedNodes = await page.locator(
+    '.c5-search-row, .c5-query-btn, .c5-fixture-hint, .c5-hard-hint, .c5-leaf-foot, .c5-create-banner, [data-testid="c5-create-banner"], [data-testid="c5-hard-no-template"], [data-testid="c5-hard-step-chain"], [data-testid="c5-goods-capsules"]',
+  ).count();
+  if (bannedNodes) throw new Error('禁止夹具/硬约束横幅、create蓝横幅、页脚或标题下长搜索条');
+  // 非搜索态时顶栏应有放大镜图标按钮（列表页）
+  const isCreate = await page.locator('[data-testid="c5-create-form"]').count();
   const searching = await page.locator('.c5-inline-search').count();
-  if (!searching) {
+  if (!isCreate && !searching) {
     const topSearch = await page.locator('[data-testid="c5-leaf-top"] [aria-label$="搜索"]').count();
     if (!topSearch) throw new Error('顶栏缺少放大镜搜索图标');
   }
@@ -187,22 +194,23 @@ await step('C5-GOODS-SEARCH-ICON', '商品列表点顶栏放大镜进入搜索�
   return 'top-magnifier-ok';
 });
 
-await step('C5-GOODS-CREATE', '商品新增直进详情表单（无模板）', async () => {
+await step('C5-GOODS-CREATE', '商品新增直进详情表单（无模板、无蓝横幅）', async () => {
   const leaf = LEAVES.find((x) => x.key === 'goods-list');
   await page.goto(leafUrl(leaf));
   await page.locator('[data-testid="c5-plus"]').click();
   await page.locator('[data-plus-key="blank"]').click();
   await page.locator('[data-testid="c5-create-form"][data-kind="goods"]').waitFor({ timeout: 10000 });
-  await page.locator('[data-testid="c5-create-banner"]').waitFor();
-  const banner = await page.locator('[data-testid="c5-create-banner"]').innerText();
+  if (await page.locator('.c5-create-banner, [data-testid="c5-create-banner"]').count()) {
+    throw new Error('新增表单禁止出现蓝横幅验收话术');
+  }
+  const body = await page.locator('[data-testid="c5-create-form"]').innerText();
   for (const bad of FORBIDDEN) {
-    if (banner.includes(bad)) throw new Error(`表单横幅含禁止文案「${bad}」`);
+    if (body.includes(bad)) throw new Error(`表单含禁止文案「${bad}」`);
   }
-  if (!banner.includes('空白新建') && !banner.includes('填写')) {
-    throw new Error(`横幅文案不对: ${banner}`);
-  }
+  await page.locator('.c5-form-h', { hasText: '基础信息' }).waitFor();
+  await page.locator('[data-testid="c5-create-save"]').waitFor();
   await shot(page, 'goods-create-form');
-  return banner.slice(0, 80);
+  return 'create-form-no-banner';
 });
 
 await step('C5-PLUS-BOM', 'BOM＋下拉（新增BOM｜扫码）', async () => {
@@ -231,6 +239,13 @@ await step('C5-BOM-UPSTREAM', 'BOM 新增关联商品 · 上游勾选完成(N)',
   await shot(page, 'upstream-bom-goods');
   await done.click();
   await page.locator('[data-testid="c5-create-form"][data-kind="bom"]').waitFor({ timeout: 10000 });
+  if (await page.locator('.c5-create-banner, [data-testid="c5-create-banner"]').count()) {
+    throw new Error('BOM 新增表单禁止蓝横幅');
+  }
+  const bomBody = await page.locator('[data-testid="c5-create-form"]').innerText();
+  for (const bad of FORBIDDEN) {
+    if (bomBody.includes(bad)) throw new Error(`BOM 表单含禁止文案「${bad}」`);
+  }
   await shot(page, 'bom-create-form');
   return selected;
 });
