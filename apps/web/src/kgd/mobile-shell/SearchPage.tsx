@@ -10,7 +10,23 @@ const SCOPE_HINT: Record<ShellTab, string> = {
   settings: '只搜设置项',
 };
 
-const SETTINGS_ITEMS = ['企业信息', '通用', '短信', '编号规则', '个人 / 帐套', '通知', '安全', '关于赛德瑞克 MES', '退出登录'];
+const SETTINGS_ITEMS = [
+  '企业信息',
+  '通用',
+  '短信',
+  '编号规则',
+  '个人 / 帐套',
+  '通知',
+  '安全',
+  '基础配置',
+  '绩效工资设置',
+  '自动出入库设置',
+  '工作站设置',
+  '基础设置',
+  '审核设置',
+  '关于赛德瑞克 MES',
+  '退出登录',
+];
 
 type Props = { scope: ShellTab };
 

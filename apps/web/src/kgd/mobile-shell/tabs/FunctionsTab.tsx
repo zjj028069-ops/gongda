@@ -13,14 +13,23 @@ function collectLeaves(nodes: MenuNode[]): MenuNode[] {
   return out;
 }
 
+function isSettingNode(node: MenuNode) {
+  return /setting|dict-menu|perf-pay|auto-stock|^station$|stock-audit/i.test(node.key) || /设置|基础配置/.test(node.label);
+}
+
+/** 发现式列表：前 5 个业务入口 + 始终钉住设置组，保证生产/仓库设置 6 叶可点入 */
 function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string } {
   const kids = menu.children ?? [];
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
-  const top = kids.slice(0, 5);
-  const rest = kids.slice(5).map((item) => item.label);
-  return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
+  const settings = kids.filter(isSettingNode);
+  const others = kids.filter((node) => !isSettingNode(node));
+  const top = others.slice(0, 5);
+  const shownKeys = new Set([...top, ...settings].map((n) => n.key));
+  const shown = [...top, ...settings.filter((n) => !top.some((t) => t.key === n.key))];
+  const rest = kids.filter((n) => !shownKeys.has(n.key)).map((item) => item.label);
+  return { shown, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
 }
 
 export function FunctionsTab() {
@@ -64,7 +73,7 @@ export function FunctionsTab() {
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
+                        {(isSettingNode(node) ? nested : nested.slice(0, 6)).map((leaf) => (
                           <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
                             <i className="ms-dot" />
                             <span>

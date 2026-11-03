@@ -18,6 +18,20 @@ const GROUP_B: Row[] = [
   { key: 'security', label: '安全', value: '改密 / 手机', glyph: '锁', color: '#E85A9B', path: '/account' },
 ];
 
+/** C1c：生产设置 4 叶 */
+const GROUP_PRODUCE: Row[] = [
+  { key: 'produce-dict-menu', label: '基础配置', value: '生产设置', glyph: '配', color: '#4184F4', path: '/setting/produce/dictionary' },
+  { key: 'perf-pay', label: '绩效工资设置', value: '生产设置', glyph: '绩', color: '#2AA8A0', path: '/setting/PerformancePay/list' },
+  { key: 'auto-stock', label: '自动出入库设置', value: '生产设置', glyph: '自', color: '#F5A623', path: '/setting/auto_stock_manage' },
+  { key: 'station', label: '工作站设置', value: '生产设置', glyph: '站', color: '#8B6BC9', path: '/setting/produce/station' },
+];
+
+/** C1c：仓库设置 2 叶 */
+const GROUP_STOCK: Row[] = [
+  { key: 'stock-setting', label: '基础设置', value: '仓库设置', glyph: '仓', color: '#34A853', path: '/setting/stock/setting' },
+  { key: 'stock-audit', label: '审核设置', value: '仓库设置', glyph: '审', color: '#E85D4C', path: '/setting/stock/audit_setting' },
+];
+
 export function SettingsTab() {
   const { session, onLogout, logoutBusy } = useKgd();
   const navigate = useNavigate();
@@ -64,6 +78,28 @@ export function SettingsTab() {
       <div className="ms-set-group">
         {GROUP_B.map((row) => (
           <button key={row.key} type="button" className="ms-set-row" onClick={() => openRow(row)}>
+            <span className="ms-avatar sm" style={{ background: row.color }}>{row.glyph}</span>
+            <span className="ms-set-label">{row.label}</span>
+            <span className="ms-set-value">{row.value}</span>
+            <IconChevron className="ms-chevron" />
+          </button>
+        ))}
+      </div>
+
+      <div className="ms-set-group" data-group="produce-setting">
+        {GROUP_PRODUCE.map((row) => (
+          <button key={row.key} type="button" className="ms-set-row" data-leaf-key={row.key} onClick={() => openRow(row)}>
+            <span className="ms-avatar sm" style={{ background: row.color }}>{row.glyph}</span>
+            <span className="ms-set-label">{row.label}</span>
+            <span className="ms-set-value">{row.value}</span>
+            <IconChevron className="ms-chevron" />
+          </button>
+        ))}
+      </div>
+
+      <div className="ms-set-group" data-group="wh-setting">
+        {GROUP_STOCK.map((row) => (
+          <button key={row.key} type="button" className="ms-set-row" data-leaf-key={row.key} onClick={() => openRow(row)}>
             <span className="ms-avatar sm" style={{ background: row.color }}>{row.glyph}</span>
             <span className="ms-set-label">{row.label}</span>
             <span className="ms-set-value">{row.value}</span>
