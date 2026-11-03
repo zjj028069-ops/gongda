@@ -1,20 +1,20 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.92",
-  "display": "SEDRIC01 v1.0.92",
-  "feature": "mobile-4tab-shell-p0",
-  "hotfix": "20261103-mobile-4tab-shell-p0",
+  "version": "1.0.96",
+  "display": "SEDRIC01 v1.0.96",
+  "feature": "mobile-c3-purchase",
+  "hotfix": "20261103-mobile-c3-purchase",
   "primary": "#4184F4",
-  "released_at": "2026-11-03T14:55:00+08:00",
+  "released_at": "2026-11-03T16:40:00+08:00",
   "features": [
-    "阶段 B 手机壳骨架 P0：≤768 微信式四栏（消息｜联系人｜功能｜设置），主色 #4184F4",
-    "顶栏细线放大镜+圆圈＋；搜索分栏不串台；联系人四类纵向；功能对齐 primaryMenus 15 一级",
-    "报价合同/销售合同上游报价入口在功能树与＋菜单保留；≥769 保留现网 PC 侧栏",
-    "已 rebase 至 v1.0.91 现网源码基线（ca009a2）；旧 v1.0.75 标号作废"
+    "阶段 C3：≤768 供应/采购 12 叶子手机镜像（供应商/计划/采购单/付款/发票/检验/规范/设置/价格追踪）",
+    "四栏壳深链 /ms/leaf + /ms/pick 上游勾选（左勾、顶已选、右上完成(N)）；主色 #4184F4",
+    "采购单加商品保留：选择采购商品｜选择采购计划商品｜选择合同商品；检验新建须选采购单",
+    "临时定版皮（单据版4 / 档案设置版1），待 Allen 重选；业务写回仍为皮提示"
   ],
-  "note": "基线=v1.0.91 list-header-filter-unify；本功能=v1.0.92 mobile-4tab-shell-p0；不重建库、不改密码、不上云待 Allen 点头；与 Garment 无关",
-  "prev": "1.0.91 list-header-filter-unify",
-  "tag": "mobile-4tab-shell-p0",
-  "baseline": "1.0.91",
-  "baseline_commit": "ca009a221f149fcb5487527b04fc5780a8e71e02"
+  "note": "基线=v1.0.92 mobile-4tab-shell-p0；本功能=v1.0.96 mobile-c3-purchase；从 main 新开，未 rebase PR#3/#4/#5；不重建库、不改密码、不上云待 Allen 点头；与 Garment 无关",
+  "prev": "1.0.92 mobile-4tab-shell-p0",
+  "tag": "mobile-c3-purchase",
+  "baseline": "1.0.92",
+  "baseline_commit": "f722120"
 }

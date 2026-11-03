@@ -61,16 +61,18 @@ export function FunctionsTab() {
                 {shown.map((node) => {
                   const nested = node.children?.length ? collectLeaves(node.children) : [];
                   if (nested.length) {
+                    const shownLeaves = menu.key === 'supply' || menu.key === 'warehouse' ? nested : nested.slice(0, 6);
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {shownLeaves.map((leaf) => (
+                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)} data-leaf-key={leaf.key}>
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
                               {leaf.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                               {leaf.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
+                              {leaf.key === 'mt-lines' && <small className="ms-fn-note">只读明细</small>}
                             </span>
                           </button>
                         ))}
@@ -78,7 +80,7 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button key={node.key} type="button" className="ms-fn-sub" data-leaf-key={node.key} onClick={() => openLeaf(node, menu)}>
                       <i className="ms-dot" />
                       <span>
                         {node.label}
