@@ -9,12 +9,15 @@ type Props = {
   onSearch: () => void;
   onPlusPick: (item: PlusItem) => void;
   hideActions?: boolean;
+  items?: PlusItem[];
+  searchLabel?: string;
+  onBack?: () => void;
 };
 
-export function MobileTopBar({ tab, title, onSearch, onPlusPick, hideActions }: Props) {
+export function MobileTopBar({ tab, title, onSearch, onPlusPick, hideActions, items, searchLabel, onBack }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const items = plusItemsFor(tab);
+  const menu = items ?? plusItemsFor(tab);
 
   useEffect(() => {
     function onDoc(ev: MouseEvent) {
@@ -26,12 +29,20 @@ export function MobileTopBar({ tab, title, onSearch, onPlusPick, hideActions }: 
 
   return (
     <header className="ms-top" data-tab={tab}>
-      <h1 className="ms-top-title">{title || TAB_LABEL[tab]}</h1>
+      <div className="ms-top-lead">
+        {onBack && (
+          <button type="button" className="ms-icon-btn" aria-label="返回" onClick={onBack}>
+            <span className="ms-back-chevron">‹</span>
+          </button>
+        )}
+        <h1 className="ms-top-title">{title || TAB_LABEL[tab]}</h1>
+      </div>
       {!hideActions && (
         <div className="ms-top-actions" ref={root}>
-          <button type="button" className="ms-icon-btn" aria-label={`${TAB_LABEL[tab]}搜索`} onClick={onSearch}>
+          <button type="button" className="ms-icon-btn" aria-label={searchLabel || `${TAB_LABEL[tab]}搜索`} onClick={onSearch}>
             <IconSearch />
           </button>
+          {menu.length > 0 && (
           <button
             type="button"
             className="ms-icon-btn"
@@ -41,9 +52,10 @@ export function MobileTopBar({ tab, title, onSearch, onPlusPick, hideActions }: 
           >
             <IconPlusCircle />
           </button>
-          {open && (
-            <div className="ms-plus-panel" role="menu" aria-label="加号菜单">
-              {items.map((item) => (
+          )}
+          {open && menu.length > 0 && (
+            <div className="ms-plus-panel" role="menu" aria-label="加号菜单" data-testid="ms-plus-panel">
+              {menu.map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -67,6 +79,7 @@ export function MobileTopBar({ tab, title, onSearch, onPlusPick, hideActions }: 
 }
 
 function glyph(item: PlusItem) {
+  if (item.glyph) return item.glyph;
   if (item.key.includes('friend') || item.key.includes('customer')) return '友';
   if (item.key.includes('group')) return '群';
   if (item.key.includes('supplier')) return '供';

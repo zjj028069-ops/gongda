@@ -1,0 +1,76 @@
+{
+  "at": "2026-11-03T07:51:28.764Z",
+  "version": "SEDRIC01 v1.0.94",
+  "feature": "mobile-c1-produce-core",
+  "seed": "reuse orders=4",
+  "passed": 11,
+  "total": 11,
+  "results": [
+    {
+      "n": "C1-1",
+      "title": "功能树进入五个生产叶子和报工工作台",
+      "result": "通过",
+      "reason": "work-order,plan-mrp,schedule,task,work-report,report-workbench"
+    },
+    {
+      "n": "C1-2",
+      "title": "加工单列表 v5 结构与详情",
+      "result": "通过",
+      "reason": "cards=4"
+    },
+    {
+      "n": "C1-3",
+      "title": "加工单＋下拉含直接创建与合同创建",
+      "result": "通过",
+      "reason": "直直接创建|合合同创建"
+    },
+    {
+      "n": "C1-4",
+      "title": "生产任务版1与派工｜扫码领任务",
+      "result": "通过",
+      "reason": "派派工|扫扫码领任务"
+    },
+    {
+      "n": "C1-5",
+      "title": "报工工作台版2与扫码｜手工",
+      "result": "通过",
+      "reason": "扫扫码报工|手手工报工"
+    },
+    {
+      "n": "C1-6",
+      "title": "报工记录版1疏朗行卡与新增｜扫码",
+      "result": "通过",
+      "reason": "新新增报工|扫扫码报工"
+    },
+    {
+      "n": "C1-7",
+      "title": "生产计划MRP版2与新增｜从合同生成",
+      "result": "通过",
+      "reason": "新新增计划|合从合同生成"
+    },
+    {
+      "n": "C1-8",
+      "title": "生产排产版3优先级 Tabs 与排入｜调期",
+      "result": "通过",
+      "reason": "排排入加工单|期批量调期"
+    },
+    {
+      "n": "C1-9",
+      "title": "窄屏 PC 路径重定向到 /ms，搜索不串台",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/inside_produce_bill/list"
+    },
+    {
+      "n": "C1-10",
+      "title": "报价与合同入口仍在",
+      "result": "通过",
+      "reason": "quote+contract"
+    },
+    {
+      "n": "C1-11",
+      "title": "≥769 PC 侧栏未坏",
+      "result": "通过",
+      "reason": "pc-ok"
+    }
+  ]
+}
