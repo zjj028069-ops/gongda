@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { primaryMenus, type MenuNode, type PrimaryMenu } from '../../menu';
 import { IconChevron } from '../icons';
 import { L1_ICON_COLORS, glyphOf } from '../types';
+import { C5_KEYS } from '../goods-master/c5Registry';
+
+const C5_KEY_SET = new Set(C5_KEYS);
 
 function collectLeaves(nodes: MenuNode[]): MenuNode[] {
   const out: MenuNode[] = [];
@@ -18,6 +21,10 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
+  /** 商品管理 / 生产管理：C5 叶子必须功能树可达，禁止 slice(0,5) 挤掉 */
+  if (menu.key === 'goods' || menu.key === 'produce') {
+    return { shown: kids, overflow: '' };
+  }
   const top = kids.slice(0, 5);
   const rest = kids.slice(5).map((item) => item.label);
   return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
@@ -25,7 +32,7 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
 
 export function FunctionsTab() {
   const navigate = useNavigate();
-  const [openKey, setOpenKey] = useState<string | null>('customer');
+  const [openKey, setOpenKey] = useState<string | null>('goods');
   const menus = useMemo(() => primaryMenus, []);
 
   function openLeaf(node: MenuNode, l1: PrimaryMenu) {
@@ -61,14 +68,22 @@ export function FunctionsTab() {
                 {shown.map((node) => {
                   const nested = node.children?.length ? collectLeaves(node.children) : [];
                   if (nested.length) {
+                    const shownLeaves = (menu.key === 'goods' || menu.key === 'produce') ? nested : nested.slice(0, 6);
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {shownLeaves.map((leaf) => (
+                          <button
+                            key={leaf.key}
+                            type="button"
+                            className="ms-fn-sub"
+                            onClick={() => openLeaf(leaf, menu)}
+                            data-leaf-key={leaf.key}
+                          >
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
+                              {C5_KEY_SET.has(leaf.key) && <small className="ms-fn-note">C5 生产资料</small>}
                               {leaf.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                               {leaf.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                             </span>
@@ -78,10 +93,17 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button
+                      key={node.key}
+                      type="button"
+                      className="ms-fn-sub"
+                      data-leaf-key={node.key}
+                      onClick={() => openLeaf(node, menu)}
+                    >
                       <i className="ms-dot" />
                       <span>
                         {node.label}
+                        {C5_KEY_SET.has(node.key) && <small className="ms-fn-note">C5 生产资料</small>}
                         {node.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
                         {node.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                         {node.key === 'plan' && <small className="ms-fn-note">生产计划MRP · 物料分析</small>}
