@@ -18,6 +18,10 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
+  /** 智能设备：C9 物联 4 叶必须功能树可达，禁止 slice 挤掉 */
+  if (menu.key === 'iot') {
+    return { shown: kids, overflow: '' };
+  }
   const top = kids.slice(0, 5);
   const rest = kids.slice(5).map((item) => item.label);
   return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
@@ -25,7 +29,7 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
 
 export function FunctionsTab() {
   const navigate = useNavigate();
-  const [openKey, setOpenKey] = useState<string | null>('customer');
+  const [openKey, setOpenKey] = useState<string | null>('iot');
   const menus = useMemo(() => primaryMenus, []);
 
   function openLeaf(node: MenuNode, l1: PrimaryMenu) {
