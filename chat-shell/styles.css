@@ -2787,3 +2787,26 @@ mark.ops {
     max-width: 100%;
   }
 }
+
+
+/* L1 NLU：示例收进次要折叠 */
+.l1-examples {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #5b6b7c;
+}
+.l1-examples summary {
+  cursor: pointer;
+  color: #4184F4;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.l1-examples summary::-webkit-details-marker { display: none; }
+.l1-examples summary::before {
+  content: "▸";
+  font-size: 10px;
+}
+.l1-examples[open] summary::before { content: "▾"; }
+.l1-examples p { margin: 6px 0 0; line-height: 1.5; }

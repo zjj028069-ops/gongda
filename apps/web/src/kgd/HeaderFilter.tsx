@@ -1,8 +1,8 @@
 /**
- * 表头筛选 · natural-v3（扁平字+蓝漏斗；仅已筛列 8px 抬起白胶囊）
+ * 表头筛选 · natural-v3 / 方案B（扁平字+蓝漏斗；仅已筛列 8px 抬起白胶囊）
  * 交互：点列头/漏斗 → 勾选菜单（含「全选」）；主色 #4184F4。
  * 仅 UI；不改业务写库。与上方方案 B query 区并存。
- * 待上云升 v1.0.66 header-filter-natural-v3（本地勿擅自 bump VERSION）。
+ * ListFrame 自 v1.0.91 list-header-filter-unify 起默认全列启用（actions / headerFilter:false 除外）。
  */
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';

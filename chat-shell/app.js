@@ -1,10 +1,11 @@
 /**
- * 赛德瑞科 · 聊天壳（同域代理登录真实 MES · SEDRIC01 v1.0.85 onboarding-l1-guide）
+ * 赛德瑞科 · 聊天壳（同域代理登录真实 MES · SEDRIC01 v1.0.90 fluent-chitchat-guard）
  * L1：引导式基础资料（手册 02→03）；确认弹窗后草案/MES 深链；不代点审核入库结算
  * S0：进度/钱/工资 → /api/ai/factory/ask；附件 → /api/ai/intake/classify + 确认卡
  * S1：三本账结构化卡片 +「去处理」MES 深链；「查一下三本账」一次出三卡
  * S2：聊天一扔就落单（认型→确认卡→writes/confirm；合同打穿；other/unknown 追问）
  * S3：本厂词典 + 一句话扩展 → /api/ai/s3/chat + 确认卡
+ * v1.0.88：shellIntentRouter 跨轨分轨（硬特征压过 L1 in_progress；not_l1 交还）
  */
 (function () {
   "use strict";
@@ -511,6 +512,10 @@
         selectSession("assistant");
       },
       nowTime: nowTime,
+      /** L1 API/规则 not_l1 时交还：用户气泡已入栈，只跑下一轨 */
+      continueRouting: function (text) {
+        continueRoutingAfterL1(text);
+      },
     });
   }
 
@@ -1273,6 +1278,13 @@
         (payload && payload.action_label) || "去处理"
       );
     }
+    if (payload && payload.next_doc_hint) {
+      var hintEl = document.createElement("p");
+      hintEl.className = "guide-summary";
+      hintEl.setAttribute("data-testid", "sedric-next-doc-hint");
+      hintEl.textContent = payload.next_doc_hint;
+      wrap.appendChild(hintEl);
+    }
     return wrap;
   }
 
@@ -1294,6 +1306,10 @@
       window.SedricOnboardingL1.renderGuideCard(wrap, m);
     } else if (m.confirm_card) {
       wrap.appendChild(buildConfirmCard(m.confirm_card, m.preview_id));
+    } else if (m.route_choice) {
+      wrap.appendChild(buildRouteChoiceCard(m.route_choice));
+    } else if (m.fluent) {
+      wrap.appendChild(buildFluentCard(m.fluent === true ? m : m.fluent));
     } else if (m.ext_ask) {
       wrap.appendChild(buildExtAskCard(m.ext_ask));
     } else if (m.ext_result) {
@@ -1892,6 +1908,388 @@
     });
   }
 
+  /** v1.0.88：统一场景分轨（硬特征 > 开户状态） */
+  function routeShellIntent(text, extra) {
+    var R = window.SedricShellIntentRouter;
+    var flags = Object.assign({}, extra || {});
+    try {
+      if (window.SedricOnboardingL1 && typeof window.SedricOnboardingL1.getState === "function") {
+        var st = window.SedricOnboardingL1.getState();
+        if (st && st.global === "in_progress") flags.l1InProgress = true;
+        if (st) flags.global = st.global;
+      }
+    } catch (e) {}
+    if (R && typeof R.shellIntentRouter === "function") return R.shellIntentRouter(text, flags);
+    // 无路由器时的最小降级：沿用旧门控顺序但不让 in_progress 独吞
+    if (looksLikeS3(text)) return { track: "B", reason: "fallback-s3" };
+    if (looksLikeFactoryAsk(text)) return { track: "D", reason: "fallback-factory" };
+    if (
+      window.SedricOnboardingL1 &&
+      typeof window.SedricOnboardingL1.looksLikeL1Intent === "function" &&
+      window.SedricOnboardingL1.looksLikeL1Intent(text)
+    ) {
+      return { track: "A", reason: "fallback-l1" };
+    }
+    return { track: "E", reason: "fallback-faq" };
+  }
+
+  function buildRouteChoiceCard(payload) {
+    var card = document.createElement("div");
+    card.className = "guide-card route-choice-card";
+    card.setAttribute("data-testid", "sedric-route-choice");
+    var h = document.createElement("div");
+    h.className = "guide-card-head";
+    h.innerHTML =
+      '<div class="guide-card-label">场景确认</div>' +
+      '<div class="guide-card-title">这句话有点两可，你想做哪件？</div>' +
+      '<p class="guide-summary">' +
+      escapeHtml((payload && payload.hint) || "加扩展字段，还是继续开户建商品？") +
+      "</p>";
+    card.appendChild(h);
+    var btns = document.createElement("div");
+    btns.className = "guide-demo-ask-btns";
+    var opts = (payload && payload.options) || [
+      { id: "field", label: "加扩展字段" },
+      { id: "onboard", label: "继续开户建商品" },
+    ];
+    var original = (payload && payload.text) || "";
+    opts.forEach(function (opt) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = opt.id === "field" ? "guide-demo-btn-yes" : "guide-demo-btn-no";
+      btn.textContent = opt.label;
+      btn.addEventListener("click", function () {
+        handleRouteChoice(opt.id, original);
+      });
+      btns.appendChild(btn);
+    });
+    card.appendChild(btns);
+    return card;
+  }
+
+  function handleRouteChoice(choiceId, originalText) {
+    if (choiceId === "field") {
+      var t = originalText || "给商品列表加个字段";
+      if (!/(字段|备注|标记|紧急度|货源地)/.test(String(t).replace(/\s+/g, ""))) {
+        t = String(t || "") + "（按加扩展字段理解）";
+      }
+      dispatchTrackB(t);
+      return;
+    }
+    if (choiceId === "onboard") {
+      if (window.SedricOnboardingL1 && typeof window.SedricOnboardingL1.handleUserText === "function") {
+        window.SedricOnboardingL1.handleUserText(originalText || "继续开户", true);
+      }
+      return;
+    }
+  }
+
+
+  /** v1.0.89：流程对答（经理式）卡片 */
+  var FLUENT_SESSION = { chapter: null, docId: null, threeQ: null, role: null, lastTag: null, history: [] };
+
+  function getFluentSession() {
+    return FLUENT_SESSION;
+  }
+
+  function setFluentSession(next) {
+    if (!next || typeof next !== "object") return;
+    FLUENT_SESSION = Object.assign({}, FLUENT_SESSION, next);
+  }
+
+  function buildFluentCard(payload) {
+    var card = document.createElement("div");
+    card.className = "guide-card fluent-qa-card";
+    card.setAttribute("data-testid", "sedric-process-fluent-qa");
+    var tag = (payload && payload.tag) || "操作问题";
+    var head = document.createElement("div");
+    head.className = "guide-card-head";
+    head.innerHTML =
+      '<div class="guide-card-label">流程对答 · 交付实施经理</div>' +
+      '<div class="guide-card-title">' +
+      escapeHtml((payload && payload.headline) || "按说明书单据序指引") +
+      "</div>" +
+      '<p class="guide-summary"><span class="fluent-tag" data-tag="' +
+      escapeHtml(tag) +
+      '">标签：' +
+      escapeHtml(tag) +
+      "</span>" +
+      (payload && payload.threeQ
+        ? " · 三问：" +
+          escapeHtml(
+            payload.threeQ === "progress"
+              ? "问进度"
+              : payload.threeQ === "money"
+                ? "问钱"
+                : payload.threeQ === "wage"
+                  ? "问工资"
+                  : String(payload.threeQ)
+          )
+        : "") +
+      "</p>";
+    card.appendChild(head);
+    if (payload && payload.judgment) {
+      var j = document.createElement("p");
+      j.className = "guide-summary";
+      j.textContent = payload.judgment;
+      card.appendChild(j);
+    }
+    if (payload && payload.steps && payload.steps.length) {
+      var ol = document.createElement("ol");
+      ol.className = "guide-steps";
+      payload.steps.forEach(function (st, i) {
+        var li = document.createElement("li");
+        li.className = "guide-step";
+        li.innerHTML =
+          '<span class="guide-step-num">' +
+          (st.n || i + 1) +
+          '</span><span class="guide-step-text">' +
+          escapeHtml(st.text || "") +
+          "</span>";
+        ol.appendChild(li);
+      });
+      card.appendChild(ol);
+    }
+    if (payload && payload.menus && payload.menus.length) {
+      var mu = document.createElement("div");
+      mu.className = "guide-summary";
+      mu.innerHTML =
+        "<strong>侧栏路径</strong><br>" +
+        payload.menus
+          .map(function (m) {
+            return "· " + escapeHtml(m);
+          })
+          .join("<br>");
+      card.appendChild(mu);
+    }
+    var foot = document.createElement("p");
+    foot.className = "guide-summary guide-catalog-hint";
+    var sess = (payload && payload.session) || {};
+    foot.textContent =
+      "会话：章 " +
+      (sess.chapter || "—") +
+      " / 单 " +
+      (sess.docId || "—") +
+      "。可说「下一步」接着导。答案依据说明书/功能地图；以屏幕为准。";
+    card.appendChild(foot);
+    return card;
+  }
+
+  function runProcessFluent(text, track) {
+    var F = window.SedricProcessFluentQa;
+    if (!F || typeof F.processFluentAnswer !== "function") return null;
+    try {
+      var res = F.processFluentAnswer(text, { track: track || "E", session: getFluentSession() });
+      if (res && res.answer && res.answer.session) setFluentSession(res.answer.session);
+      return res;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function pushBotReply(reply) {
+    if (!THREADS[currentId]) THREADS[currentId] = [];
+    THREADS[currentId].push(reply);
+    persistChatState();
+    renderThread();
+  }
+
+  function dispatchTrackB(text) {
+    if (!currentUser) {
+      pushBotReply({
+        role: "assistant",
+        text: "本厂词典和扩展应用需要先登录 MES。",
+        time: nowTime(),
+      });
+      return;
+    }
+    askS3(text)
+      .then(function (reply) {
+        pushBotReply(
+          reply || {
+            role: "assistant",
+            text: "这句话还不能写入词典或扩展。直接说人话即可，例如：「给商品列表加个货源地」「合同要能按有没有备注筛选」「加工单加个紧急度」。",
+            time: nowTime(),
+          }
+        );
+      })
+      .catch(function (e) {
+        pushBotReply({
+          role: "assistant",
+          text: "词典/扩展暂时不可用：" + ((e && e.message) || "请稍后重试"),
+          time: nowTime(),
+        });
+      });
+  }
+
+  function dispatchTrackC(text) {
+    // 壳工具与加字段同走 S3 口（previewExtChat / shell_tool）
+    dispatchTrackB(text);
+  }
+
+  function dispatchTrackD(text) {
+    // v1.0.89：D 轨先跑流程对答（三问/单据序）；教法或先后判断命中则经理式回复；
+    // 纯查数句仍走工厂 API，并可附下一单据提示。
+    var fluentRes = runProcessFluent(text, "D");
+    if (fluentRes && fluentRes.handled && fluentRes.answer) {
+      var ans = fluentRes.answer;
+      pushBotReply({
+        role: "assistant",
+        fluent: ans,
+        text: ans.text,
+        time: nowTime(),
+      });
+      // 若已登录且像查数，再补一枪工厂数（不挡流程卡）
+      if (currentUser && window.SedricProcessFluentQa && typeof window.SedricProcessFluentQa.detectThreeQ === "function") {
+        var tq = window.SedricProcessFluentQa.detectThreeQ(text);
+        if (tq && !/(怎么|如何|教我|还是|先).{0,12}(报工|入库|开单)/.test(String(text || "").replace(/\s+/g, ""))) {
+          askFactory(text)
+            .then(function (reply) {
+              if (reply && reply.factory) {
+                var hint =
+                  window.SedricProcessFluentQa.nextDocHint(tq, getFluentSession());
+                if (hint && reply.factory && !reply.factory.next_doc_hint) {
+                  reply.factory.next_doc_hint = hint;
+                }
+                pushBotReply(reply);
+              }
+            })
+            .catch(function () {});
+        }
+      }
+      return;
+    }
+    if (!currentUser) {
+      pushBotReply({
+        role: "assistant",
+        text: "查进度/钱/工资需要先登录 MES。",
+        time: nowTime(),
+      });
+      return;
+    }
+    askFactory(text)
+      .then(function (reply) {
+        try {
+          var F = window.SedricProcessFluentQa;
+          if (F && reply && reply.factory) {
+            var tq2 = F.detectThreeQ(text);
+            reply.factory.next_doc_hint = F.nextDocHint(tq2, getFluentSession());
+          }
+        } catch (e) {}
+        pushBotReply(reply);
+      })
+      .catch(function (e) {
+        pushBotReply({
+          role: "assistant",
+          text: "工厂助理暂时不可用：" + ((e && e.message) || "请稍后重试"),
+          time: nowTime(),
+        });
+      });
+  }
+
+  /** v1.0.90：身份/闲聊短答（不套流程卡、不甩「书上暂未写到」） */
+  function sedricIdentityShortReply() {
+    return {
+      role: "assistant",
+      text:
+        "我是赛德瑞克助手（SEDRIC01）。按现网流程帮你问进度、钱、工资，也能开户引导、加字段、进 MES。直接说人话就行，例如：「这单进度怎么样了」「工资怎么还没出来」「开始开户引导」。",
+      time: nowTime(),
+      chitchat: true,
+    };
+  }
+
+  function looksLikeChitchatOrIdentityLocal(text) {
+    var F = window.SedricProcessFluentQa;
+    if (F && typeof F.looksLikeChitchatOrIdentity === "function") {
+      try {
+        return !!F.looksLikeChitchatOrIdentity(text);
+      } catch (e) {}
+    }
+    var t = String(text || "").replace(/\s+/g, "");
+    if (!t) return false;
+    if (/^(你好|您好|嗨|哈喽|hello|hi|在吗|在不在|谢谢|多谢|拜拜|再见)$/i.test(t)) return true;
+    if (/你是谁|你叫什么|介绍一下你自己|自我介绍|干什么的|做什么的/.test(t)) return true;
+    return false;
+  }
+
+  function dispatchTrackE(text) {
+    var session = SESSIONS.find(function (x) {
+      return x.id === currentId;
+    });
+    var reply;
+    if (session && session.kind === "bot") {
+      if (session.id === "file" || session.botKey === "file") {
+        reply = {
+          role: "assistant",
+          text: "文件助手主要用于图纸/工艺单/名片认型。可拖入附件，或切换到「赛德瑞科助手」问用法。",
+          time: nowTime(),
+        };
+      } else {
+        // v1.0.90：身份/闲聊优先短答，绝不套流程卡 / 「书上暂未写到」
+        if (looksLikeChitchatOrIdentityLocal(text)) {
+          reply = sedricIdentityShortReply();
+        } else {
+          // E 轨流程对答（白名单经理式）；未命中且非流程未知时走 guide；guide 也无则短答
+          var fluentRes = runProcessFluent(text, "E");
+          if (fluentRes && fluentRes.handled && fluentRes.answer && fluentRes.reason !== "白名单未命中") {
+            reply = {
+              role: "assistant",
+              fluent: fluentRes.answer,
+              text: fluentRes.answer.text,
+              time: nowTime(),
+            };
+          } else if (fluentRes && fluentRes.handled && fluentRes.reason === "白名单未命中") {
+            // 仅流程问法未命中才允许「书上暂未写到」；先试旧 guide 专题
+            var guideReply = replyFromGuide(text);
+            if (guideReply && guideReply.guide) {
+              reply = guideReply;
+            } else {
+              reply = {
+                role: "assistant",
+                fluent: fluentRes.answer,
+                text: fluentRes.answer.text,
+                time: nowTime(),
+              };
+            }
+          } else {
+            // fluent 未命中且非流程未知 → guide；guide 无专题则身份短答（禁止再甩「书上暂未写到」）
+            var guide2 = replyFromGuide(text);
+            if (guide2 && guide2.guide) {
+              reply = guide2;
+            } else if (looksLikeChitchatOrIdentityLocal(text)) {
+              reply = sedricIdentityShortReply();
+            } else {
+              // catalog 兜底也改成短答，避免空目录+误流程感；仍禁止「书上暂未写到」
+              reply = sedricIdentityShortReply();
+            }
+          }
+        }
+      }
+    } else {
+      reply = {
+        role: "peer",
+        text: "（演示）对方已读：「" + text + "」",
+        time: nowTime(),
+      };
+    }
+    pushBotReply(reply);
+  }
+
+  /** L1 not_l1 交还：跳过 A，按硬特征/其余轨继续（用户句已在线程里） */
+  function continueRoutingAfterL1(text) {
+    var route = routeShellIntent(text, { l1InProgress: false });
+    // 强制不再进 A，避免死循环
+    if (route.track === "A" || route.track === "ambiguous") {
+      if (looksLikeS3(text)) route = { track: "B", reason: "handoff-s3" };
+      else if (looksLikeFactoryAsk(text)) route = { track: "D", reason: "handoff-factory" };
+      else route = { track: "E", reason: "handoff-faq" };
+    }
+    if (route.track === "B") return dispatchTrackB(text);
+    if (route.track === "C") return dispatchTrackC(text);
+    if (route.track === "D") return dispatchTrackD(text);
+    return dispatchTrackE(text);
+  }
+
   /**
    * S3 入口门控：与服务端 looksLikeShellToolIntent 语义对齐（阶段 0 · intent-first）
    * 生成意图优先：宽动词 +（工具/钟/时钟/计时/盘/表…）或极短「帮我写一个X」；
@@ -2164,71 +2562,64 @@
       if (currentId === (session && session.id)) renderThread();
     };
 
-    /* L1 开户引导：口语→草案→确认弹窗（优先于 FAQ/工厂助理） */
+    /* v1.0.88 shell-intent-router：先定场景再进唯一主轨 */
     if (
       session &&
       session.kind === "bot" &&
-      (session.id === "assistant" || session.botKey === "assistant") &&
-      window.SedricOnboardingL1 &&
-      typeof window.SedricOnboardingL1.handleUserText === "function"
+      (session.id === "assistant" || session.botKey === "assistant")
     ) {
-      const L1 = window.SedricOnboardingL1;
-      if (L1.looksLikeL1Intent(text) || (L1.getState && L1.getState().global === "in_progress")) {
+      var route = routeShellIntent(text);
+      if (route.track === "ambiguous") {
+        pushReply({
+          role: "assistant",
+          route_choice: {
+            text: text,
+            hint: "加扩展字段，还是继续开户建商品？",
+            options: [
+              { id: "field", label: "加扩展字段" },
+              { id: "onboard", label: "继续开户建商品" },
+            ],
+          },
+          time: nowTime(),
+        });
+        return;
+      }
+      if (route.track === "B") {
+        dispatchTrackB(text);
+        return;
+      }
+      if (route.track === "C") {
+        dispatchTrackC(text);
+        return;
+      }
+      if (route.track === "D") {
+        dispatchTrackD(text);
+        return;
+      }
+      if (
+        route.track === "A" &&
+        window.SedricOnboardingL1 &&
+        typeof window.SedricOnboardingL1.handleUserText === "function"
+      ) {
+        const L1 = window.SedricOnboardingL1;
         const handled = L1.handleUserText(text, false);
+        if (handled && typeof handled.then === "function") {
+          handled.then(function (h) {
+            if (h) persistChatState();
+            else continueRoutingAfterL1(text);
+          });
+          return;
+        }
         if (handled) {
           persistChatState();
           return;
         }
-      }
-    }
-
-    if (session && session.kind === "bot" && (session.id === "assistant" || session.botKey === "assistant") && looksLikeS3(text)) {
-      if (!currentUser) {
-        pushReply({
-          role: "assistant",
-          text: "本厂词典和扩展应用需要先登录 MES。",
-          time: nowTime(),
-        });
+        // handleUserText 同步 false → 交还
+        continueRoutingAfterL1(text);
         return;
       }
-      askS3(text)
-        .then(function (reply) {
-          pushReply(
-            reply || {
-              role: "assistant",
-              text: "这句话还不能写入词典或扩展。直接说人话即可，例如：「给商品列表加个货源地」「合同要能按有没有备注筛选」「加工单加个紧急度」。词典例：「把大板记成物料 XXX」。",
-              time: nowTime(),
-            }
-          );
-        })
-        .catch(function (e) {
-          pushReply({
-            role: "assistant",
-            text: "词典/扩展暂时不可用：" + ((e && e.message) || "请稍后重试"),
-            time: nowTime(),
-          });
-        });
-      return;
-    }
-
-    if (session && session.kind === "bot" && (session.id === "assistant" || session.botKey === "assistant") && looksLikeFactoryAsk(text)) {
-      if (!currentUser) {
-        pushReply({
-          role: "assistant",
-          text: "查进度/钱/工资需要先登录 MES。",
-          time: nowTime(),
-        });
-        return;
-      }
-      askFactory(text)
-        .then(pushReply)
-        .catch(function (e) {
-          pushReply({
-            role: "assistant",
-            text: "工厂助理暂时不可用：" + ((e && e.message) || "请稍后重试"),
-            time: nowTime(),
-          });
-        });
+      // E 或未挂 L1：走 FAQ
+      dispatchTrackE(text);
       return;
     }
 

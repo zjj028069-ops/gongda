@@ -1388,7 +1388,7 @@ body:has(.kgd-app) .ant-picker-dropdown .ant-picker-panel-container {
 
 /* —— 表头筛选 · natural-v3：默认扁平+蓝漏斗；仅已筛列 8px 抬起白胶囊 ——
    对照 ref-match-v3。主色 #4184F4。与上方 query 方案B并存。
-   待上云升 v1.0.66 header-filter-natural-v3。 */
+   v1.0.91 list-header-filter-unify：ListFrame 默认全列表头筛。 */
 .kgd-app .ant-table-thead > tr > th.kgd-hf-col {
   overflow: visible;
   padding-top: 6px;

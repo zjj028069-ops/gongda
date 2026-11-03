@@ -1,31 +1,31 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.85",
-  "display": "SEDRIC01 v1.0.85",
-  "feature": "onboarding-l1-guide",
-  "hotfix": "20261030-onboarding-l1-guide-v185",
+  "version": "1.0.91",
+  "display": "SEDRIC01 v1.0.91",
+  "feature": "list-header-filter-unify",
+  "hotfix": "20261031-list-header-filter-v191",
   "primary": "#4184F4",
-  "released_at": "2026-10-30T09:18:46+08:00",
+  "released_at": "2026-10-31T14:28:46+08:00",
   "features": [
-    "L1 引导式基础资料录入（手册 02→03）：欢迎卡 / 状态机 / 口语→草案 / 确认弹窗",
-    "localStorage sedric_onboarding_l1；可跳过、可继续开户引导",
-    "写库：确认后草案已确认待 MES 落库 + navigateMes 深链；禁止伪造审核/入库/结算",
-    "人员密码遮罩可显示一次；席位不足阻断；BOM 只预填打开 MES",
-    "仅 chat-shell；未改 apps/web 手机断点；未部署腾讯云、未重建库、未改密码",
-    "基线自 1.0.84 mobile-bill-flat-p41 递增"
+    "公共 ListFrame 默认启用表头筛选：标题+蓝漏斗（FilterOutlined）；筛中态抬起白胶囊显示已选值（方案B/natural-v3）",
+    "各业务列表（客户/加工单/仓库单等）继承，无需逐页硬改；headerFilter:false 或 actions 列可关闭",
+    "商品列表原有显式 headerFilter/valueOf 保留；CSS/HeaderFilter 组件不变",
+    "≤768 手机卡片路径不改；PC 宽屏为主",
+    "热修上云；不重建库、不改密码、不开云端 Cursor；与 Garment 无关"
   ],
-  "note": "chat-shell only；API 主数据写未接通时走待落库草案；与 Garment Agent 无关",
-  "prev": "1.0.84 mobile-bill-flat-p41",
-  "tag": "onboarding-l1-guide",
-  "dist_js": null,
-  "dist_css": null,
-  "chat_shell": {
+  "note": "hotfix list-header-filter-unify；VPS 备份 .bak-*-list-header-filter-v191",
+  "prev": "1.0.90 fluent-chitchat-guard",
+  "tag": "list-header-filter-unify",
+  "dist_js": "index-BqFMGIGc.js",
+  "dist_css": "index-Cw_vdb1_.css",
+  "web": {
     "files": [
-      "chat-shell/app.js",
-      "chat-shell/index.html",
-      "chat-shell/styles.css",
-      "chat-shell/version.json",
-      "chat-shell/guide/onboarding-l1.js"
+      "apps/web/src/kgd/ListFrame.tsx",
+      "apps/web/src/kgd/HeaderFilter.tsx",
+      "apps/web/src/kgd/kgd.css",
+      "apps/web/dist/index.html",
+      "apps/web/dist/assets/index-BqFMGIGc.js",
+      "apps/web/dist/assets/index-Cw_vdb1_.css"
     ]
   }
 }

@@ -1,9 +1,7 @@
 {
-  "product": "SEDRIC01",
-  "version": "1.0.67",
-  "display": "SEDRIC01 v1.0.67",
-  "feature": "craft-route-add-fix",
-  "hotfix": "20261023-craft-route-add-v167",
+  "name": "SEDRIC01",
+  "version": "1.0.91",
+  "feature": "list-header-filter-unify",
   "primary": "#4184F4",
-  "note": "craft-route-add-fix: BrowserRouter useTransitions={false} 修复工艺路线列表 SPA navigate 只改 URL 不换页导致「新增」无反应；两处 BrowserRouter 均关闭 transition"
+  "released_at": "2026-10-31T14:28:46+08:00"
 }

@@ -40,7 +40,11 @@ export type ListColumn<T> = {
   key: string; title: string; width?: number; missing?: boolean;
   render?: (row: T, index?: number) => ReactNode;
   onCell?: (row: T, index: number) => { rowSpan?: number; colSpan?: number };
-  /** 表头列筛（结合1）；与上方 query 区并存，不改业务写库 */
+  /**
+   * 表头列筛（方案B / natural-v3：标题+蓝漏斗；筛中抬起白胶囊）。
+   * 默认：非 actions 列一律开启（从 render 纯文本去重）；显式 false 关闭；对象可定制 options/valueOf。
+   * 与上方 query 区并存，不改业务写库。v1.0.91 list-header-filter-unify。
+   */
   headerFilter?: HeaderFilterConfig<T>;
 };
 export type ChipGroup = { key: string; label: string; missing?: boolean; options: { value: string; label: string; disabled?: boolean; reason?: string }[] };
@@ -128,6 +132,19 @@ export function nodeText(node: ReactNode): string {
   return '';
 }
 
+
+
+/** 解析列是否启用表头筛：actions / 显式 false 关闭；缺省与 true/对象开启 */
+function resolveHeaderFilter<T>(column: ListColumn<T>): false | HeaderFilterConfig<T> {
+  if (column.key === 'actions') return false;
+  if (column.headerFilter === false) return false;
+  return column.headerFilter ?? true;
+}
+
+function headerFilterValueOf<T>(column: ListColumn<T>, cfg: HeaderFilterConfig<T>): (row: T) => string {
+  if (typeof cfg === 'object' && cfg.valueOf) return cfg.valueOf;
+  return (row: T) => (column.render ? nodeText(column.render(row)) : '');
+}
 
 function isInteractiveNode(node: ReactNode): boolean {
   if (node === null || node === undefined || typeof node === 'boolean') return false;
@@ -459,28 +476,26 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
   const visibleKey = visible.map((column) => column.key).join('\0');
   useEffect(() => { onVisibleKeys?.(visibleKey ? visibleKey.split('\0') : []); }, [onVisibleKeys, visibleKey]);
   const locked = new Set(prefs.locked);
-  // 表头列筛：先按已选值过滤 loaded rows，再做客户端分页；服务端分页时只筛当前页数据
+  // 表头列筛（v1.0.91 默认全开）：先按已选值过滤 loaded rows，再做客户端分页；服务端分页时只筛当前页数据
   const filteredRows = useMemo(() => {
     const active = Object.entries(headerFilters).filter(([, values]) => values.length > 0);
     if (!active.length) return rows;
     return rows.filter((row) => active.every(([key, values]) => {
       const column = columns.find((item) => item.key === key);
-      if (!column?.headerFilter) return true;
-      const cfg = column.headerFilter;
-      const valueOf = (typeof cfg === 'object' && cfg.valueOf)
-        ? cfg.valueOf
-        : (item: T) => (column.render ? nodeText(column.render(item)) : '');
-      return values.includes(valueOf(row));
+      if (!column) return true;
+      const cfg = resolveHeaderFilter(column);
+      if (cfg === false) return true;
+      return values.includes(headerFilterValueOf(column, cfg)(row));
     }));
   }, [columns, headerFilters, rows]);
   const pageRows = clientPaging ? filteredRows.slice((page - 1) * pageSize, page * pageSize) : filteredRows;
   const tableColumns = visible.map((column) => {
-    const hf = column.headerFilter;
+    const hf = resolveHeaderFilter(column);
     let titleNode: ReactNode = column.title;
-    if (hf && column.key !== 'actions') {
-      const cfg = typeof hf === 'object' ? hf : {};
-      const valueOf = cfg.valueOf ?? ((row: T) => (column.render ? nodeText(column.render(row)) : ''));
-      const options = dedupeHeaderOptions(rows, valueOf, cfg.options);
+    if (hf !== false) {
+      const presetOptions = typeof hf === 'object' ? hf.options : undefined;
+      const valueOf = headerFilterValueOf(column, hf);
+      const options = dedupeHeaderOptions(rows, valueOf, presetOptions);
       const selected = headerFilters[column.key] ?? [];
       titleNode = (
         <HeaderFilterTitle
@@ -504,7 +519,7 @@ export function ListFrame<T extends { id: string | number }>({ pageKey, columns:
       fixed: column.key === 'actions' ? 'right' as const : locked.has(column.key) ? 'left' as const : undefined,
       render: (_: unknown, row: T, index: number) => column.render ? column.render(row, index) : '',
       onCell: column.onCell ? (row: T, index?: number) => column.onCell!(row, index ?? 0) : undefined,
-      onHeaderCell: hf && column.key !== 'actions' ? () => ({ className: 'kgd-hf-col' }) : undefined,
+      onHeaderCell: hf !== false ? () => ({ className: 'kgd-hf-col' }) : undefined,
     };
   });
   function exportList(kind: 'all' | 'visible') {
