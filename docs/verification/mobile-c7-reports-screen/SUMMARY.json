@@ -1,0 +1,173 @@
+{
+  "version": "SEDRIC01 v1.0.100",
+  "feature": "mobile-c7-reports-screen",
+  "baseline": "v1.0.92",
+  "leaves": "22/22",
+  "passed": 27,
+  "failed": 0,
+  "total": 27,
+  "results": [
+    {
+      "n": "C7-L01",
+      "title": "≤768 主路径 大屏管理",
+      "result": "通过",
+      "reason": "layout=v1-screen"
+    },
+    {
+      "n": "C7-L02",
+      "title": "≤768 主路径 机台报表",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L03",
+      "title": "≤768 主路径 产量报表",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L04",
+      "title": "≤768 主路径 在制品报表",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L05",
+      "title": "≤768 主路径 工序打卡计时",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L06",
+      "title": "≤768 主路径 不良品趋势分析",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L07",
+      "title": "≤768 主路径 不良品柏拉图",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L08",
+      "title": "≤768 主路径 不良品项明细",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L09",
+      "title": "≤768 主路径 采购检验分析",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L10",
+      "title": "≤768 主路径 生产抽检分析",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L11",
+      "title": "≤768 主路径 报废返工统计",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L12",
+      "title": "≤768 主路径 设备维修分析",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L13",
+      "title": "≤768 主路径 维修工作量统计",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L14",
+      "title": "≤768 主路径 维保计划统计",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L15",
+      "title": "≤768 主路径 采购对账单",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L16",
+      "title": "≤768 主路径 销售对账单",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L17",
+      "title": "≤768 主路径 合同报表",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L18",
+      "title": "≤768 主路径 成本报表",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L19",
+      "title": "≤768 主路径 AI库存监控",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L20",
+      "title": "≤768 主路径 进销存汇总",
+      "result": "通过",
+      "reason": "layout=v1-sparse"
+    },
+    {
+      "n": "C7-L21",
+      "title": "≤768 主路径 生产工资报表",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-L22",
+      "title": "≤768 主路径 智能报表",
+      "result": "通过",
+      "reason": "layout=v4-detail"
+    },
+    {
+      "n": "C7-FN-TREE",
+      "title": "功能树可进报表/大屏叶子",
+      "result": "通过",
+      "reason": "report+screen leaves visible"
+    },
+    {
+      "n": "C7-SCREEN-OPEN",
+      "title": "大屏列表点开全屏/外链",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/_screen/pd/b78adb66-74ae-4e05-9c84-a24910f8c0f8"
+    },
+    {
+      "n": "C7-SEARCH-ICON",
+      "title": "顶栏细线放大镜点开再搜",
+      "result": "通过",
+      "reason": "search ok"
+    },
+    {
+      "n": "C7-PC-WIDE",
+      "title": "≥769 PC 侧栏仍在、不进手机壳",
+      "result": "通过",
+      "reason": "pc ok"
+    },
+    {
+      "n": "C7-NO-M-ROUTE",
+      "title": "禁止 /m/* 报工域冲突路由",
+      "result": "通过",
+      "reason": "ms only"
+    }
+  ]
+}

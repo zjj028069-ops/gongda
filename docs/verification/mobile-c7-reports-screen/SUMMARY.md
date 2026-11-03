@@ -1,0 +1,34 @@
+# mobile-c7-reports-screen 验收
+
+- 版本：SEDRIC01 v1.0.100
+- 基线：v1.0.92
+- 叶子：22/22
+- 用例：27/27 通过
+
+- [通过] C7-L01 ≤768 主路径 大屏管理 — layout=v1-screen
+- [通过] C7-L02 ≤768 主路径 机台报表 — layout=v4-detail
+- [通过] C7-L03 ≤768 主路径 产量报表 — layout=v1-sparse
+- [通过] C7-L04 ≤768 主路径 在制品报表 — layout=v4-detail
+- [通过] C7-L05 ≤768 主路径 工序打卡计时 — layout=v4-detail
+- [通过] C7-L06 ≤768 主路径 不良品趋势分析 — layout=v1-sparse
+- [通过] C7-L07 ≤768 主路径 不良品柏拉图 — layout=v1-sparse
+- [通过] C7-L08 ≤768 主路径 不良品项明细 — layout=v4-detail
+- [通过] C7-L09 ≤768 主路径 采购检验分析 — layout=v1-sparse
+- [通过] C7-L10 ≤768 主路径 生产抽检分析 — layout=v1-sparse
+- [通过] C7-L11 ≤768 主路径 报废返工统计 — layout=v1-sparse
+- [通过] C7-L12 ≤768 主路径 设备维修分析 — layout=v1-sparse
+- [通过] C7-L13 ≤768 主路径 维修工作量统计 — layout=v1-sparse
+- [通过] C7-L14 ≤768 主路径 维保计划统计 — layout=v1-sparse
+- [通过] C7-L15 ≤768 主路径 采购对账单 — layout=v4-detail
+- [通过] C7-L16 ≤768 主路径 销售对账单 — layout=v4-detail
+- [通过] C7-L17 ≤768 主路径 合同报表 — layout=v4-detail
+- [通过] C7-L18 ≤768 主路径 成本报表 — layout=v1-sparse
+- [通过] C7-L19 ≤768 主路径 AI库存监控 — layout=v4-detail
+- [通过] C7-L20 ≤768 主路径 进销存汇总 — layout=v1-sparse
+- [通过] C7-L21 ≤768 主路径 生产工资报表 — layout=v4-detail
+- [通过] C7-L22 ≤768 主路径 智能报表 — layout=v4-detail
+- [通过] C7-FN-TREE 功能树可进报表/大屏叶子 — report+screen leaves visible
+- [通过] C7-SCREEN-OPEN 大屏列表点开全屏/外链 — http://127.0.0.1:5173/_screen/pd/b78adb66-74ae-4e05-9c84-a24910f8c0f8
+- [通过] C7-SEARCH-ICON 顶栏细线放大镜点开再搜 — search ok
+- [通过] C7-PC-WIDE ≥769 PC 侧栏仍在、不进手机壳 — pc ok
+- [通过] C7-NO-M-ROUTE 禁止 /m/* 报工域冲突路由 — ms only
