@@ -1,20 +1,21 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.105",
-  "display": "SEDRIC01 v1.0.105",
-  "feature": "mobile-c9-iot-skin-final",
-  "hotfix": "20261103-mobile-c9-iot-skin-final",
+  "version": "1.0.106",
+  "display": "SEDRIC01 v1.0.106",
+  "feature": "mobile-c4-customer-skin-final",
+  "hotfix": "20261103-mobile-c4-customer-skin-final",
   "primary": "#4184F4",
-  "released_at": "2026-11-03T20:30:00+08:00",
+  "released_at": "2026-11-03T21:10:00+08:00",
   "features": [
-    "C9 物联定版落地（4 叶改皮）：iot-scene 版4 / iot-sensor 版3 / iot-alarm 版3 / iot-base 版5",
-    "相对 v1.0.104：传感器临时版4→版3 状态Tabs；基础设置临时版1→版5 极简开关行；场景/报警核对对齐",
-    "路由 /ms/leaf?key=…；≤768 四栏壳；顶栏细线放大镜＋微信气泡；写回为皮 toast",
-    "基线 GitHub main = v1.0.104；未 rebase C0～C8；未合入、未上腾讯云"
+    "C4 客户组定版落地：客户列表版2关键字段；报价/合同/收支/销售费用版2金额优先；发票版2总览；公海版2未跟进天数；价格追踪版2现价；基础设置与审核设置版5极简",
+    "联系人、跟单保持微信纵向一行；壳联系人栏加朋友/建群不改",
+    "报价行生成合同进入合同订单；合同右上＋保留报价单创建，进入选择上游报价后完成(N)",
+    "路由 /ms/leaf?key=…；≤768 四栏壳；顶栏细线放大镜；写回为产品 toast",
+    "基线 GitHub main = v1.0.105；未合入、未上腾讯云"
   ],
-  "note": "基线=v1.0.104 mobile-c9-iot；本功能=v1.0.105 mobile-c9-iot-skin-final；不重建库、不改密码、不上云",
-  "prev": "1.0.104 mobile-c9-iot",
-  "tag": "mobile-c9-iot-skin-final",
-  "baseline": "1.0.104",
-  "baseline_commit": "9bb3aa4"
+  "note": "基线=v1.0.105 mobile-c9-iot-skin-final；本功能=v1.0.106 mobile-c4-customer-skin-final；不重建库、不改密码、不上云",
+  "prev": "1.0.105 mobile-c9-iot-skin-final",
+  "tag": "mobile-c4-customer-skin-final",
+  "baseline": "1.0.105",
+  "baseline_commit": "f48e639"
 }

@@ -18,8 +18,8 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
-  /** 智能设备：C9 物联 4 叶必须功能树可达，禁止 slice 挤掉 */
-  if (menu.key === 'iot') {
+  /** 物联 4 叶、客户 12 叶必须功能树可达，禁止 slice 挤掉 */
+  if (menu.key === 'iot' || menu.key === 'customer') {
     return { shown: kids, overflow: '' };
   }
   const top = kids.slice(0, 5);
@@ -65,29 +65,36 @@ export function FunctionsTab() {
                 {shown.map((node) => {
                   const nested = node.children?.length ? collectLeaves(node.children) : [];
                   if (nested.length) {
+                    const shownLeaves = menu.key === 'customer' ? nested : nested.slice(0, 6);
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {shownLeaves.map((leaf) => (
+                          <button
+                            key={leaf.key}
+                            type="button"
+                            className="ms-fn-sub"
+                            data-leaf-key={leaf.key}
+                            onClick={() => openLeaf(leaf, menu)}
+                          >
                             <i className="ms-dot" />
-                            <span>
-                              {leaf.label}
-                              {leaf.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
-                              {leaf.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
-                            </span>
+                            <span>{leaf.label}</span>
                           </button>
                         ))}
                       </div>
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button
+                      key={node.key}
+                      type="button"
+                      className="ms-fn-sub"
+                      data-leaf-key={node.key}
+                      onClick={() => openLeaf(node, menu)}
+                    >
                       <i className="ms-dot" />
                       <span>
                         {node.label}
-                        {node.key === 'quote' && <small className="ms-fn-note">手机必留 · 可操作</small>}
-                        {node.key === 'contract' && <small className="ms-fn-note">须选上游报价</small>}
                         {node.key === 'plan' && <small className="ms-fn-note">生产计划MRP · 物料分析</small>}
                       </span>
                     </button>

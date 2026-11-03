@@ -55,9 +55,9 @@ export function plusItemsFor(tab: ShellTab): PlusItem[] {
   }
   if (tab === 'functions') {
     return [
-      { key: 'add-quote', label: '新增报价合同', hint: '硬约束入口保留', reserved: 'quote' },
-      { key: 'contract-from-quote', label: '报价单创建合同', hint: '＋下拉→勾选上游报价→完成', reserved: 'contract-from-quote' },
-      { key: 'add-generic', label: '新增单据（占位）', hint: '列表类后续统一＋皮' },
+      { key: 'add-quote', label: '新增报价合同', reserved: 'quote' },
+      { key: 'contract-from-quote', label: '报价单创建合同', reserved: 'contract-from-quote' },
+      { key: 'add-generic', label: '新增单据' },
     ];
   }
   return [
