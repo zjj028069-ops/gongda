@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { C1C_LEAF_REGISTRY } from './leaves/registry';
 
 /**
- * 功能叶子 / 设置深链占位。
- * 报价合同、销售合同（上游报价）硬约束：入口必须保留，禁止做成只能空白新增的死胡同。
+ * 功能叶子 / 设置深链。
+ * C1c 六叶走 registry 真皮；其余仍为壳占位（报价合同硬约束入口保留）。
  */
 export function LeafPlaceholder() {
   const [params] = useSearchParams();
@@ -12,6 +13,9 @@ export function LeafPlaceholder() {
   const title = params.get('title') || '功能页';
   const path = params.get('path') || '';
   const l1 = params.get('l1') || '';
+
+  const Skin = C1C_LEAF_REGISTRY[key];
+  if (Skin) return <Skin />;
 
   const isQuote = key === 'quote' || path.includes('contract_quotation');
   const isContract = key === 'contract' || path.includes('customer_contract');

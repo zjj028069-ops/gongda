@@ -1,20 +1,20 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.92",
-  "display": "SEDRIC01 v1.0.92",
-  "feature": "mobile-4tab-shell-p0",
-  "hotfix": "20261103-mobile-4tab-shell-p0",
+  "version": "1.0.102",
+  "display": "SEDRIC01 v1.0.102",
+  "feature": "mobile-c1c-settings-gap",
+  "hotfix": "20261103-mobile-c1c-settings-gap",
   "primary": "#4184F4",
-  "released_at": "2026-11-03T14:55:00+08:00",
+  "released_at": "2026-11-03T18:30:00+08:00",
   "features": [
-    "阶段 B 手机壳骨架 P0：≤768 微信式四栏（消息｜联系人｜功能｜设置），主色 #4184F4",
-    "顶栏细线放大镜+圆圈＋；搜索分栏不串台；联系人四类纵向；功能对齐 primaryMenus 15 一级",
-    "报价合同/销售合同上游报价入口在功能树与＋菜单保留；≥769 保留现网 PC 侧栏",
-    "已 rebase 至 v1.0.91 现网源码基线（ca009a2）；旧 v1.0.75 标号作废"
+    "C1c 设置补全 6 叶：生产设置4（基础配置定版2分类优先 / 绩效工资 / 自动出入库 / 工作站）+ 仓库设置2（基础设置疏朗分组 / 审核设置）",
+    "路由统一 /ms/leaf?key=…；顶栏细线放大镜+右上＋微信气泡；主色 #4184F4；挂四栏壳",
+    "功能树钉住生产/仓库设置组；设置页可点入 6 叶；写回皮 toast；Playwright 可达+禁字+截图",
+    "基线 GitHub main=v1.0.92（PR#2）；本波独立开分支，未 rebase/合入 C0～C7/C1b"
   ],
-  "note": "基线=v1.0.91 list-header-filter-unify；本功能=v1.0.92 mobile-4tab-shell-p0；不重建库、不改密码、不上云待 Allen 点头；与 Garment 无关",
-  "prev": "1.0.91 list-header-filter-unify",
-  "tag": "mobile-4tab-shell-p0",
-  "baseline": "1.0.91",
-  "baseline_commit": "ca009a221f149fcb5487527b04fc5780a8e71e02"
+  "note": "基线=v1.0.92 mobile-4tab-shell-p0；本功能=v1.0.102 mobile-c1c-settings-gap；不重建库、不改密码、不上云、不 merge；临时皮约定仅写 PR 描述待 Allen 重选皮",
+  "prev": "1.0.92 mobile-4tab-shell-p0",
+  "tag": "mobile-c1c-settings-gap",
+  "baseline": "1.0.92",
+  "baseline_commit": "f722120"
 }
