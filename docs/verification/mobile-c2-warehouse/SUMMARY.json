@@ -1,0 +1,286 @@
+{
+  "version": "SEDRIC01 v1.0.95 mobile-c2-warehouse",
+  "playwright": "26/26",
+  "leafLists": "15/15",
+  "routes": [
+    {
+      "leaf": "库存管理",
+      "key": "stock",
+      "pc": "/goods_stock/list",
+      "ms": "/ms/leaf?key=stock&path=/goods_stock/list",
+      "layout": "v4-alarm",
+      "plus": false
+    },
+    {
+      "leaf": "采购入库单",
+      "key": "in-purchase",
+      "pc": "/purchase_stock_in_bill/list",
+      "ms": "/ms/leaf?key=in-purchase&path=/purchase_stock_in_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "成品入库单",
+      "key": "in-fg",
+      "pc": "/produce_stock_in_bill/list",
+      "ms": "/ms/leaf?key=in-fg&path=/produce_stock_in_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "半成品入库单",
+      "key": "in-semi",
+      "pc": "/semi_finished_products_stock_in_bill/list",
+      "ms": "/ms/leaf?key=in-semi&path=/semi_finished_products_stock_in_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "生产退料单",
+      "key": "in-return",
+      "pc": "/produce_return_materiel_bill/list",
+      "ms": "/ms/leaf?key=in-return&path=/produce_return_materiel_bill/list",
+      "layout": "v1-sparse",
+      "plus": true
+    },
+    {
+      "leaf": "销售退货单",
+      "key": "in-sale-return",
+      "pc": "/salesReturnOrder/list",
+      "ms": "/ms/leaf?key=in-sale-return&path=/salesReturnOrder/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "其他入库单",
+      "key": "in-other",
+      "pc": "/else_stock_in_bill/list",
+      "ms": "/ms/leaf?key=in-other&path=/else_stock_in_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "销售出库单",
+      "key": "out-sale",
+      "pc": "/sale_stock_out_bill/list",
+      "ms": "/ms/leaf?key=out-sale&path=/sale_stock_out_bill/list",
+      "layout": "v2-qty",
+      "plus": true
+    },
+    {
+      "leaf": "生产出库单",
+      "key": "out-produce",
+      "pc": "/production_out_of_storage/list",
+      "ms": "/ms/leaf?key=out-produce&path=/production_out_of_storage/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "采购退货单",
+      "key": "out-purchase",
+      "pc": "/purchase_return_bill/list",
+      "ms": "/ms/leaf?key=out-purchase&path=/purchase_return_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "其他出库单",
+      "key": "out-other",
+      "pc": "/else_stock_out_bill/list",
+      "ms": "/ms/leaf?key=out-other&path=/else_stock_out_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "调拨单",
+      "key": "transfer",
+      "pc": "/stock_allocate_bill/list",
+      "ms": "/ms/leaf?key=transfer&path=/stock_allocate_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "库存盘点",
+      "key": "check",
+      "pc": "/stock_taking_bill/list",
+      "ms": "/ms/leaf?key=check&path=/stock_taking_bill/list",
+      "layout": "v4-detail",
+      "plus": true
+    },
+    {
+      "leaf": "出入库流水",
+      "key": "flow",
+      "pc": "/stock_item/list",
+      "ms": "/ms/leaf?key=flow&path=/stock_item/list",
+      "layout": "v4-detail",
+      "plus": false
+    },
+    {
+      "leaf": "仓库档案",
+      "key": "warehouse-list",
+      "pc": "/ware/list",
+      "ms": "/ms/leaf?key=warehouse-list&path=/ware/list",
+      "layout": "v1-sparse",
+      "plus": true
+    }
+  ],
+  "results": [
+    {
+      "n": "C2-L01",
+      "title": "≤768 列表 库存管理",
+      "result": "通过",
+      "reason": "layout=v4-alarm;plus=0"
+    },
+    {
+      "n": "C2-L02",
+      "title": "≤768 列表 采购入库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L03",
+      "title": "≤768 列表 成品入库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L04",
+      "title": "≤768 列表 半成品入库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L05",
+      "title": "≤768 列表 生产退料单",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C2-L06",
+      "title": "≤768 列表 销售退货单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L07",
+      "title": "≤768 列表 其他入库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L08",
+      "title": "≤768 列表 销售出库单",
+      "result": "通过",
+      "reason": "layout=v2-qty;plus=1"
+    },
+    {
+      "n": "C2-L09",
+      "title": "≤768 列表 生产出库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L10",
+      "title": "≤768 列表 采购退货单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L11",
+      "title": "≤768 列表 其他出库单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L12",
+      "title": "≤768 列表 调拨单",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L13",
+      "title": "≤768 列表 库存盘点",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=1"
+    },
+    {
+      "n": "C2-L14",
+      "title": "≤768 列表 出入库流水",
+      "result": "通过",
+      "reason": "layout=v4-detail;plus=0"
+    },
+    {
+      "n": "C2-L15",
+      "title": "≤768 列表 仓库档案",
+      "result": "通过",
+      "reason": "layout=v1-sparse;plus=1"
+    },
+    {
+      "n": "C2-PLUS-SEMI",
+      "title": "半成品入库＋下拉",
+      "result": "通过",
+      "reason": "工从加工单入库|＋新增|扫扫码"
+    },
+    {
+      "n": "C2-PLUS-PURCHASE",
+      "title": "采购入库＋下拉",
+      "result": "通过",
+      "reason": "＋空白新增|采从采购单入库|扫扫码"
+    },
+    {
+      "n": "C2-PLUS-SALE",
+      "title": "销售出库＋下拉（合同出库必留）",
+      "result": "通过",
+      "reason": "合合同出库|＋空白新增|扫扫码"
+    },
+    {
+      "n": "C2-UP-SEMI",
+      "title": "半成品上游选单 · 左勾顶已选右上完成(N)",
+      "result": "通过",
+      "reason": "已选 1 · JG20261028012"
+    },
+    {
+      "n": "C2-UP-PURCHASE",
+      "title": "采购入库上游选单",
+      "result": "通过",
+      "reason": "完成(2)"
+    },
+    {
+      "n": "C2-UP-SALE",
+      "title": "销售出库合同上游选单",
+      "result": "通过",
+      "reason": "完成(1)"
+    },
+    {
+      "n": "C2-FLOW-NO-PLUS",
+      "title": "流水无＋",
+      "result": "通过",
+      "reason": "no-plus"
+    },
+    {
+      "n": "C2-TREE",
+      "title": "功能树可达仓库叶子",
+      "result": "通过",
+      "reason": "leaves=15"
+    },
+    {
+      "n": "C2-PC-REDIRECT",
+      "title": "窄屏 PC path 重定向 /ms",
+      "result": "通过",
+      "reason": "http://127.0.0.1:5173/ms/leaf?key=stock&title=%E5%BA%93%E5%AD%98%E7%AE%A1%E7%90%86&path=%2Fgoods_stock%2Flist&l1=warehouse"
+    },
+    {
+      "n": "C2-QUOTE-SAFE",
+      "title": "报价/合同入口未破坏",
+      "result": "通过",
+      "reason": "ok"
+    },
+    {
+      "n": "C2-DESKTOP",
+      "title": "≥769 PC 侧栏未坏",
+      "result": "通过",
+      "reason": "sidebar-ok"
+    }
+  ],
+  "note": "未 merge、未上腾讯云、未重建库、未改密码、未动 garment；空数据用夹具"
+}
