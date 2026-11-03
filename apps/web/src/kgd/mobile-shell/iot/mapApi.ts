@@ -55,25 +55,47 @@ export function mapApiItems(leaf: C9LeafDef, items: Record<string, unknown>[]): 
       };
     }
     if (leaf.key === 'iot-sensor') {
-      const bind = str(item.bind_status);
-      const tone: FixtureRow['statusTone'] = bind.includes('未') ? 'warn' : 'ok';
+      const rawStatus = str(item.status || item.bind_status || item.online_status);
+      let status = 'online';
+      let statusText = '在线';
+      let statusTone: FixtureRow['statusTone'] = 'ok';
+      if (rawStatus.includes('离线') || rawStatus.toLowerCase() === 'offline') {
+        status = 'offline';
+        statusText = '离线';
+        statusTone = 'mute';
+      } else if (rawStatus.includes('告警') || rawStatus.includes('报警') || rawStatus.toLowerCase() === 'alarm') {
+        status = 'alarm';
+        statusText = '告警';
+        statusTone = 'bad';
+      } else if (rawStatus.includes('未')) {
+        status = 'offline';
+        statusText = '离线';
+        statusTone = 'mute';
+      }
+      const kind = str(item.kind || item.point_name || item.name, '测点');
+      const code = str(item.code, `S${String(idx + 1).padStart(3, '0')}`);
       return {
         id,
-        code: str(item.code, `S${String(idx + 1).padStart(3, '0')}`),
-        name: str(item.kind || item.point_name || item.name, '测点'),
-        status: bind.includes('未') ? 'warn' : 'ok',
-        statusText: bind || '正常',
-        statusTone: tone,
-        kind: str(item.kind),
+        code,
+        name: kind.includes(code) ? kind : `${kind} ${code}`,
+        status,
+        statusText,
+        statusTone,
+        kind,
         unit: str(item.unit),
         value: str(item.value || item.sensor_value),
         threshold: str(item.threshold),
         scene: str(item.scene_name),
         point: str(item.point_name),
+        workshop: str(item.shop_name || item.workshop),
+        line: str(item.line_name || item.line),
         gateway: str(item.gateway),
         interval: str(item.interval_text),
-        bindStatus: bind,
-        iconGlyph: str(item.kind, '测').slice(0, 1),
+        bindStatus: rawStatus,
+        deviceCode: code,
+        time: str(item.updated_at || item.time),
+        alarmHint: str(item.alarm_hint || item.alarm_msg),
+        iconGlyph: kind.slice(0, 1),
       };
     }
     if (leaf.key === 'iot-alarm') {

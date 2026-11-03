@@ -1,20 +1,20 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.104",
-  "display": "SEDRIC01 v1.0.104",
-  "feature": "mobile-c9-iot",
-  "hotfix": "20261103-mobile-c9-iot",
+  "version": "1.0.105",
+  "display": "SEDRIC01 v1.0.105",
+  "feature": "mobile-c9-iot-skin-final",
+  "hotfix": "20261103-mobile-c9-iot-skin-final",
   "primary": "#4184F4",
-  "released_at": "2026-11-03T19:20:00+08:00",
+  "released_at": "2026-11-03T20:30:00+08:00",
   "features": [
-    "C9 智能设备·物联手机镜像 4 叶：iot-scene / iot-sensor / iot-alarm / iot-base",
-    "临时皮：场景·传感器版4 明细行卡；报警版3 状态Tabs；基础设置版1 疏朗入口卡（待 Allen 重选皮）",
+    "C9 物联定版落地（4 叶改皮）：iot-scene 版4 / iot-sensor 版3 / iot-alarm 版3 / iot-base 版5",
+    "相对 v1.0.104：传感器临时版4→版3 状态Tabs；基础设置临时版1→版5 极简开关行；场景/报警核对对齐",
     "路由 /ms/leaf?key=…；≤768 四栏壳；顶栏细线放大镜＋微信气泡；写回为皮 toast",
-    "基线 GitHub main = v1.0.92；未 rebase C0～C8；未合入、未上腾讯云"
+    "基线 GitHub main = v1.0.104；未 rebase C0～C8；未合入、未上腾讯云"
   ],
-  "note": "基线=v1.0.92 mobile-4tab-shell-p0；本功能=v1.0.104 mobile-c9-iot；缺口组物联临时皮待 Allen 重选皮；不重建库、不改密码、不上云",
-  "prev": "1.0.92 mobile-4tab-shell-p0",
-  "tag": "mobile-c9-iot",
-  "baseline": "1.0.92",
-  "baseline_commit": "f722120"
+  "note": "基线=v1.0.104 mobile-c9-iot；本功能=v1.0.105 mobile-c9-iot-skin-final；不重建库、不改密码、不上云",
+  "prev": "1.0.104 mobile-c9-iot",
+  "tag": "mobile-c9-iot-skin-final",
+  "baseline": "1.0.104",
+  "baseline_commit": "9bb3aa4"
 }

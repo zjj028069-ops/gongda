@@ -20,7 +20,19 @@ function matchStatusTab(row: FixtureRow, tabKey: string) {
   if (tabKey === 'open') return row.status === 'open' || row.statusText.includes('未处理') || row.statusText.includes('待');
   if (tabKey === 'doing') return row.status === 'doing' || row.statusText.includes('处理中');
   if (tabKey === 'closed') return row.status === 'closed' || row.statusText.includes('已关闭') || row.statusText.includes('已消');
+  if (tabKey === 'online') return row.status === 'online' || row.statusText.includes('在线');
+  if (tabKey === 'offline') return row.status === 'offline' || row.statusText.includes('离线');
+  if (tabKey === 'alarm') {
+    return row.status === 'alarm' || row.statusText.includes('告警') || row.statusText.includes('报警');
+  }
   return true;
+}
+
+function sensorSectionLabel(tabKey: string) {
+  if (tabKey === 'online') return '在线传感器';
+  if (tabKey === 'offline') return '离线传感器';
+  if (tabKey === 'alarm') return '告警传感器';
+  return '全部传感器';
 }
 
 export function IotLeaf({ leafKey }: { leafKey: string }) {
@@ -32,6 +44,7 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
   const [q, setQ] = useState('');
   const [toast, setToast] = useState('');
   const [statusTab, setStatusTab] = useState('all');
+  const [switchMap, setSwitchMap] = useState<Record<string, boolean>>({});
   const url = leaf ? listPath(leaf) : null;
   const remote = useRemote<{ items?: Record<string, unknown>[] }>(url, revision, onExpired);
 
@@ -64,7 +77,7 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
 
   const { items, fromFixture } = useMemo(() => {
     if (!leaf) return { items: [] as FixtureRow[], fromFixture: true };
-    if (leaf.layout === 'v1-settings') {
+    if (leaf.layout === 'v5-switch-rows') {
       return { items: FIXTURES[leaf.key] ?? [], fromFixture: true };
     }
     const apiItems = mapApiItems(leaf, remote.data?.items ?? []);
@@ -72,6 +85,13 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
     const rows = reallyFixture ? (FIXTURES[leaf.key] ?? apiItems) : apiItems;
     return { items: rows, fromFixture: reallyFixture };
   }, [leaf, remote.data]);
+
+  useEffect(() => {
+    if (!leaf || leaf.layout !== 'v5-switch-rows') return;
+    const next: Record<string, boolean> = {};
+    for (const row of items) next[row.id] = !!row.settingOn;
+    setSwitchMap(next);
+  }, [leaf, items]);
 
   const filtered = useMemo(() => {
     let rows = items;
@@ -84,6 +104,7 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
       const blob = [
         row.code, row.name, row.gateway, row.workshop, row.line, row.kind,
         row.scene, row.point, row.device, row.deviceCode, row.location, row.level,
+        row.settingDesc,
       ].filter(Boolean).join(' ');
       return blob.includes(needle);
     });
@@ -111,8 +132,12 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
     setToast(`已打开：${item.label}`);
   }
 
-  function onSettingOpen(row: FixtureRow) {
-    setToast(`已打开：${row.name}`);
+  function onSwitch(row: FixtureRow) {
+    setSwitchMap((prev) => {
+      const nextOn = !(prev[row.id] ?? !!row.settingOn);
+      setToast(nextOn ? `已开启：${row.name}` : `已关闭：${row.name}`);
+      return { ...prev, [row.id]: nextOn };
+    });
   }
 
   return (
@@ -122,7 +147,6 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
       data-key={leaf.key}
       data-layout={leaf.layout}
       data-fixture={fromFixture ? '1' : '0'}
-      data-temp={leaf.tempSkin ? '1' : '0'}
     >
       <LeafChrome
         title={leaf.title}
@@ -146,16 +170,6 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
         </div>
       )}
 
-      {leaf.key === 'iot-sensor' && (
-        <div className="c9-panel-head" data-testid="c9-sensor-head">
-          <span className="c9-thumb sm" aria-hidden>感</span>
-          <div>
-            <strong>传感器监控</strong>
-            <p>实时监控测点数据与状态</p>
-          </div>
-        </div>
-      )}
-
       {leaf.layout === 'v3-status-tabs' && leaf.statusTabs && (
         <div className="c9-tabs underline" data-testid="c9-status-tabs" role="tablist">
           {leaf.statusTabs.map((tab) => (
@@ -173,6 +187,16 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
         </div>
       )}
 
+      {leaf.key === 'iot-sensor' && (
+        <div className="c9-list-meta" data-testid="c9-sensor-meta">
+          <span className="c9-section-title tight">
+            <i />
+            {sensorSectionLabel(statusTab)} ({filtered.length})
+          </span>
+          <span className="c9-sort">默认排序 ▾</span>
+        </div>
+      )}
+
       {leaf.key === 'iot-alarm' && (
         <div className="c9-section-title" data-testid="c9-alarm-count">
           <i />
@@ -180,10 +204,30 @@ export function IotLeaf({ leafKey }: { leafKey: string }) {
         </div>
       )}
 
-      <div className={`c9-list ${leaf.layout === 'v1-settings' ? 'is-sparse' : ''}`} data-testid="c9-list">
-        {filtered.map((row) => renderC9Card(leaf.layout, leaf.key, row, () => onSettingOpen(row)))}
-        {!filtered.length && <div className="ms-empty">无匹配记录</div>}
-      </div>
+      {leaf.layout === 'v5-switch-rows' ? (
+        <div className="c9-switch-panel" data-testid="c9-list">
+          {filtered.map((row) => renderC9Card(leaf.layout, leaf.key, row, {
+            switchOn: switchMap[row.id] ?? !!row.settingOn,
+            onSwitch: () => onSwitch(row),
+          }))}
+          {!filtered.length && <div className="ms-empty">无匹配记录</div>}
+        </div>
+      ) : (
+        <div className="c9-list" data-testid="c9-list">
+          {filtered.map((row) => renderC9Card(leaf.layout, leaf.key, row))}
+          {!filtered.length && <div className="ms-empty">无匹配记录</div>}
+        </div>
+      )}
+
+      {leaf.key === 'iot-sensor' && (
+        <div className="c9-tip" data-testid="c9-sensor-tip">
+          <span className="c9-tip-ico" aria-hidden>✓</span>
+          <div>
+            <strong>数据每10秒更新一次</strong>
+            <p>如需查看历史数据或配置设备，请进入详情页</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
