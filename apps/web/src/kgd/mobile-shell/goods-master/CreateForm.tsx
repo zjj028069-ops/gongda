@@ -34,8 +34,8 @@ export function CreateForm({ kind, title, onCancel, onSave, linkedGoods }: Props
 
       <div className="c5-create-banner" data-testid="c5-create-banner">
         {kind === 'goods'
-          ? '对齐快工单：空白新建，直进表单（无商品模板）'
-          : '新增 BOM 直进表单 · 可关联商品 · 无模板勾选'}
+          ? '空白新建商品，直接填写基础信息与库存预警'
+          : '空白新建 BOM，可关联商品后填写明细'}
       </div>
 
       {kind === 'goods' ? (

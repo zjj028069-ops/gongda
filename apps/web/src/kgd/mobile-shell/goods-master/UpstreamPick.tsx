@@ -28,12 +28,12 @@ export function GoodsMasterUpstreamPick() {
     const extra: Record<string, string> = {
       action: mode,
       upstream: selected.join(','),
-      toast: `已选 ${selected.length} 项进入${leaf.title}（皮）`,
+      toast: `已选 ${selected.length} 项，进入${leaf.title}`,
     };
     if (mode === 'blank' && kind === 'goods') {
       extra.action = 'create';
       extra.linked = names;
-      extra.toast = names ? `已关联商品：${names}（皮）` : '新增BOM入口已打开（皮）';
+      extra.toast = names ? `已关联商品：${names}` : '新增BOM已打开';
     }
     if (leaf.createForm && (mode === 'blank' || mode === 'create')) {
       extra.action = 'create';

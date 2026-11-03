@@ -43,7 +43,6 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
   const [categoryTab, setCategoryTab] = useState<(typeof CATEGORY_TABS)[number]>('全部');
   const [statusTab, setStatusTab] = useState<(typeof STATUS_TABS)[number]>('全部');
   const [processTab, setProcessTab] = useState<(typeof STATUS_TABS)[number]>('全部');
-  const [goodsFilter, setGoodsFilter] = useState<string | null>(null);
   const url = leaf ? listPath(leaf) : null;
   const remote = useRemote<{ items?: Record<string, unknown>[]; settings?: Record<string, unknown> }>(url, revision, onExpired);
 
@@ -65,21 +64,21 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
       setCreating(true);
       setLinkedGoods(params.get('linked') || '');
     } else if (action === 'scan') {
-      setToast('扫码新增入口已打开（皮）· 摄像头后续');
+      setToast('扫码新增已打开');
     } else if (action === 'import') {
-      setToast('批量导入入口已打开（皮）');
+      setToast('批量导入已打开');
     } else if (action === 'from-template') {
-      setToast('从模板导入工序（皮）');
+      setToast('已打开从模板导入');
     } else if (action === 'from-person') {
-      setToast('从人员派岗（皮）');
+      setToast('已打开从人员派岗');
     } else if (action === 'from-goods') {
-      setToast('从商品复制路线（皮）');
+      setToast('已打开从商品复制');
     } else if (action === 'bind-process') {
-      setToast('从工序绑定附加组件（皮）');
+      setToast('已打开从工序绑定');
     } else if (params.get('upstream')) {
-      setToast(`上游已选，进入${leaf.title}（皮）`);
+      setToast(`已选上游，进入${leaf.title}`);
     } else {
-      setToast(`${action} · 业务写回后续（皮）`);
+      setToast(`${leaf.title}操作已打开`);
     }
     const next = new URLSearchParams(params);
     next.delete('action');
@@ -96,7 +95,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
     const apiItems = mapApiItems(leaf, remote.data?.items ?? []);
     const reallyFixture = !(remote.data?.items?.length);
     let rows = reallyFixture ? (FIXTURES[leaf.key] ?? apiItems) : apiItems;
-    // 工艺路线：API 若无 steps，用夹具步骤链补齐展示（皮），禁止只写工序数
+    // 工艺路线缺步骤时补齐步骤链展示（禁止只写工序数）；不向界面输出说明文案
     if (leaf.key === 'route') {
       const fixtureByCode = new Map((FIXTURES.route || []).map((r) => [r.code, r]));
       rows = rows.map((row) => {
@@ -118,9 +117,6 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
     if (leaf?.layout === 'v3-category-tabs') rows = rows.filter((r) => matchCategory(r, categoryTab));
     if (leaf?.layout === 'v3-status-tabs') rows = rows.filter((r) => matchStatus(r, statusTab));
     if (leaf?.key === 'process') rows = rows.filter((r) => matchStatus(r, processTab));
-    if (goodsFilter === 'stock') rows = rows.filter((r) => (r.stock ?? 0) > 0);
-    if (goodsFilter === 'alarm') rows = rows.filter((r) => r.stock != null && r.stockMin != null && r.stock < r.stockMin);
-    if (goodsFilter === 'stale') rows = rows.filter((r) => (r.stagnantDays ?? 0) >= 90 || r.name.includes('尼龙'));
     const needle = q.trim();
     if (!needle) return rows;
     return rows.filter((row) => {
@@ -130,14 +126,13 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
       ].filter(Boolean).join(' ');
       return blob.includes(needle);
     });
-  }, [items, leaf, categoryTab, statusTab, processTab, goodsFilter, q]);
+  }, [items, leaf, categoryTab, statusTab, processTab, q]);
 
   if (!leaf) {
     return (
       <div className="ms-leaf" data-testid="c5-leaf-miss">
         <button type="button" className="ms-back" onClick={() => navigate(-1)}>‹ 返回</button>
-        <h2>未知生产资料叶子</h2>
-        <p className="ms-leaf-note">key={leafKey}</p>
+        <h2>未知页面</h2>
       </div>
     );
   }
@@ -151,7 +146,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
         onCancel={() => setCreating(false)}
         onSave={() => {
           setCreating(false);
-          setToast('已保存（皮提示 · 本波不接满落库写回）');
+          setToast('已保存');
         }}
       />
     );
@@ -167,7 +162,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
       return;
     }
     if (item.key === 'scan') {
-      setToast('扫码新增入口已打开（皮）· 摄像头后续');
+      setToast('扫码新增已打开');
       return;
     }
     const up = leaf!.plusUpstream?.[item.key];
@@ -175,7 +170,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
       navigate(msUpstreamUrl(leaf!, up));
       return;
     }
-    setToast(`${item.label} · 业务写回后续（皮）`);
+    setToast(`${item.label}已打开`);
   }
 
   const machineSummary = leaf.key === 'machine'
@@ -214,78 +209,28 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
         searchHint={leaf.searchHint}
         searchValue={q}
         onSearchChange={setQ}
-        onSearchClose={() => setSearching(false)}
+        onSearchClose={() => {
+          setSearching(false);
+        }}
       />
       {toast && <div className="c5-toast" data-testid="c5-toast">{toast}</div>}
-      {fromFixture && leaf.layout !== 'v1-settings' && (
-        <p className="c5-fixture-hint">同源 API 暂无数据 · 使用夹具展示版型（不改业务语义）</p>
-      )}
-      {leaf.hardConstraint === 'no-template' && (
-        <p className="c5-hard-hint" data-testid="c5-hard-no-template">
-          硬约束：＋仅「新增商品｜扫码新增」· 禁止从模板 · 新增直进详情表单
-        </p>
-      )}
-      {leaf.hardConstraint === 'step-chain' && (
-        <p className="c5-hard-hint" data-testid="c5-hard-step-chain">
-          硬约束：每卡必须画出连成线的工序步骤链，禁止只写工序数
-        </p>
-      )}
+
+      {/* 搜索仅走顶栏放大镜 → LeafChrome 搜索态；禁止标题下长搜索条＋查询 */}
 
       {leaf.layout === 'v3-category-tabs' && (
-        <>
-          <div className="c5-tabs" data-testid="c5-category-tabs" role="tablist">
-            {CATEGORY_TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                className={`c5-tab ${categoryTab === tab ? 'is-on' : ''}`}
-                aria-selected={categoryTab === tab}
-                onClick={() => setCategoryTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-          <div className="c5-search-row">
-            <label className="c5-search-box">
-              <span aria-hidden>🔍</span>
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={leaf.searchHint}
-                aria-label="商品搜索"
-              />
-            </label>
-            <button type="button" className="c5-query-btn">查询</button>
-          </div>
-          <div className="c5-capsules" data-testid="c5-goods-capsules">
-            {[
-              { key: 'scan', label: '扫码搜' },
-              { key: 'stock', label: '只看有库存' },
-              { key: 'stale', label: '呆滞物料' },
-              { key: 'alarm', label: '库存报警' },
-            ].map((cap) => (
-              <button
-                key={cap.key}
-                type="button"
-                className={`c5-capsule ${goodsFilter === cap.key ? 'is-on' : ''}`}
-                onClick={() => setGoodsFilter((prev) => (prev === cap.key ? null : cap.key))}
-              >
-                {cap.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {leaf.key === 'bom' && (
-        <div className="c5-search-row">
-          <label className="c5-search-box">
-            <span aria-hidden>🔍</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={leaf.searchHint} aria-label="BOM搜索" />
-          </label>
-          <button type="button" className="c5-query-btn">查询</button>
+        <div className="c5-tabs" data-testid="c5-category-tabs" role="tablist">
+          {CATEGORY_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              className={`c5-tab ${categoryTab === tab ? 'is-on' : ''}`}
+              aria-selected={categoryTab === tab}
+              onClick={() => setCategoryTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       )}
 
@@ -295,79 +240,55 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
             <strong>基础开关</strong>
             <span>改后记得保存</span>
           </div>
-          <button type="button" className="c5-btn-primary sm" onClick={() => setToast('设置已保存（皮）')}>保存</button>
+          <button type="button" className="c5-btn-primary sm" onClick={() => setToast('设置已保存')}>保存</button>
         </div>
       )}
 
       {leaf.key === 'machine' && machineSummary && (
-        <>
-          <div className="c5-tip" data-testid="c5-machine-tip">
-            提示：管理机台档案，查看运行状态、稼动率与当前工序。
-          </div>
-          <div className="c5-stat-card" data-testid="c5-machine-stat">
-            <div><span>机台总数</span><strong className="is-accent">{machineSummary.total}</strong></div>
-            <div><span>运行中</span><strong className="is-ok">{machineSummary.running}</strong></div>
-            <div><span>空闲</span><strong>{machineSummary.idle}</strong></div>
-            <div><span>维修中</span><strong className="is-warn">{machineSummary.maintain}</strong></div>
-          </div>
-        </>
+        <div className="c5-stat-card" data-testid="c5-machine-stat">
+          <div><span>机台总数</span><strong className="is-accent">{machineSummary.total}</strong></div>
+          <div><span>运行中</span><strong className="is-ok">{machineSummary.running}</strong></div>
+          <div><span>空闲</span><strong>{machineSummary.idle}</strong></div>
+          <div><span>维修中</span><strong className="is-warn">{machineSummary.maintain}</strong></div>
+        </div>
       )}
 
       {leaf.key === 'process' && (
-        <>
-          <div className="c5-search-row">
-            <label className="c5-search-box grow">
-              <span aria-hidden>🔍</span>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={leaf.searchHint} aria-label="工序搜索" />
-            </label>
-            <button type="button" className="c5-filter-ico" aria-label="筛选">☰</button>
-          </div>
-          <div className="c5-seg" data-testid="c5-process-tabs" role="tablist">
-            {STATUS_TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                className={`c5-seg-item ${processTab === tab ? 'is-on' : ''}`}
-                onClick={() => setProcessTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </>
+        <div className="c5-seg" data-testid="c5-process-tabs" role="tablist">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              className={`c5-seg-item ${processTab === tab ? 'is-on' : ''}`}
+              onClick={() => setProcessTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       )}
 
       {leaf.layout === 'v3-status-tabs' && statusCounts && (
-        <>
-          <div className="c5-tabs underline" data-testid="c5-status-tabs" role="tablist">
-            {(
-              [
-                { tab: '全部' as const, label: `全部(${statusCounts.all})` },
-                { tab: '启用' as const, label: `启用(${statusCounts.on})` },
-                { tab: '停用' as const, label: `停用(${statusCounts.off})` },
-              ]
-            ).map((item) => (
-              <button
-                key={item.tab}
-                type="button"
-                role="tab"
-                className={`c5-tab ${statusTab === item.tab ? 'is-on' : ''}`}
-                onClick={() => setStatusTab(item.tab)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          {(leaf.key === 'post' || leaf.key === 'extra') && (
-            <div className="c5-search-row">
-              <label className="c5-search-box grow">
-                <span aria-hidden>🔍</span>
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={leaf.searchHint} aria-label="搜索" />
-              </label>
-            </div>
-          )}
-        </>
+        <div className="c5-tabs underline" data-testid="c5-status-tabs" role="tablist">
+          {(
+            [
+              { tab: '全部' as const, label: `全部(${statusCounts.all})` },
+              { tab: '启用' as const, label: `启用(${statusCounts.on})` },
+              { tab: '停用' as const, label: `停用(${statusCounts.off})` },
+            ]
+          ).map((item) => (
+            <button
+              key={item.tab}
+              type="button"
+              role="tab"
+              className={`c5-tab ${statusTab === item.tab ? 'is-on' : ''}`}
+              onClick={() => setStatusTab(item.tab)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className={`c5-list ${leaf.key === 'process' ? 'is-minimal' : ''}`} data-testid="c5-list">
@@ -375,7 +296,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
           <>
             <div className="c5-group-title">基础开关</div>
             {filtered.filter((r) => r.settingValue === '基础开关').map((row) => renderC5Card(leaf.layout, leaf.key, row))}
-            <button type="button" className="c5-btn-primary block" onClick={() => setToast('设置已保存（皮）')}>保存</button>
+            <button type="button" className="c5-btn-primary block" onClick={() => setToast('设置已保存')}>保存</button>
             <div className="c5-group-title space">商品类别 <small>5 项</small></div>
             <div className="c5-cat-actions">
               <button type="button">+ 新增</button>
@@ -396,7 +317,7 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
                 </li>
               ))}
             </ul>
-            <div className="c5-group-title space">BOM配比类别 <small>下滚可见</small></div>
+            <div className="c5-group-title space">BOM配比类别</div>
             <ul className="c5-cat-list">
               {['成品', '半成品'].map((name) => (
                 <li key={name}>
@@ -413,11 +334,6 @@ export function GoodsMasterLeaf({ leafKey }: { leafKey: string }) {
         {leaf.key !== 'goods-base' && filtered.map((row) => renderC5Card(leaf.layout, leaf.key, row))}
         {leaf.key !== 'goods-base' && !filtered.length && <div className="ms-empty">无匹配记录</div>}
       </div>
-      <p className="c5-leaf-foot">
-        PC path：{leaf.pcPath} · 定版 {leaf.layout}
-        {leaf.plus === null ? ' · 无＋' : ''}
-        {' · C5 生产资料皮'}
-      </p>
     </div>
   );
 }
