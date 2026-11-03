@@ -29,9 +29,11 @@ export type FixtureRow = {
   time?: string;
   result?: string;
   sensorValue?: string;
+  alarmHint?: string;
   settingKey?: string;
   settingDesc?: string;
-  settingTone?: 'blue' | 'green' | 'purple';
+  settingTone?: 'blue' | 'green' | 'purple' | 'orange';
+  settingOn?: boolean;
   iconGlyph?: string;
   group?: string;
 };
@@ -80,49 +82,34 @@ export const FIXTURES: Record<string, FixtureRow[]> = {
   ],
   'iot-sensor': [
     row({
-      id: 's1', code: 'S001', name: '温度', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '温度', unit: '°C', value: '28.6', threshold: '≤30 / ≥15',
-      scene: '注塑车间', point: '反应釜外壁', gateway: 'GW-01', interval: '5s', iconGlyph: '温',
+      id: 's1', code: 'WT-01', name: '温度传感器 WT-01', status: 'online', statusText: '在线', statusTone: 'ok',
+      kind: '温度传感器', unit: '°C', value: '36.7',
+      workshop: '车间 1-1', line: '生产线 A', deviceCode: 'WT-01', time: '09:41', iconGlyph: '温',
     }),
     row({
-      id: 's2', code: 'S002', name: '湿度', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '湿度', unit: '%RH', value: '52.3', threshold: '≤60 / ≥30',
-      scene: '装配生产线', point: '干燥箱', gateway: 'GW-02', interval: '10s', iconGlyph: '湿',
+      id: 's2', code: 'PR-02', name: '压力传感器 PR-02', status: 'online', statusText: '在线', statusTone: 'ok',
+      kind: '压力传感器', unit: 'kPa', value: '101.2',
+      workshop: '车间 1-2', line: '液压站', deviceCode: 'PR-02', time: '09:41', iconGlyph: '压',
     }),
     row({
-      id: 's3', code: 'S003', name: '压力', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '压力', unit: 'kPa', value: '101.2', threshold: '≤120 / ≥80',
-      scene: '注塑车间', point: '液压回路', gateway: 'GW-01', interval: '5s', iconGlyph: '压',
+      id: 's3', code: 'HM-03', name: '湿度传感器 HM-03', status: 'online', statusText: '在线', statusTone: 'ok',
+      kind: '湿度传感器', unit: '%RH', value: '52.3',
+      workshop: '装配车间', line: '干燥箱', deviceCode: 'HM-03', time: '09:40', iconGlyph: '湿',
     }),
     row({
-      id: 's4', code: 'S004', name: '流量', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '流量', unit: 'm³/h', value: '35.7', threshold: '≤50 / ≥10',
-      scene: '能源动力区', point: '冷却回路', gateway: 'GW-06', interval: '15s', iconGlyph: '流',
+      id: 's4', code: 'VB-04', name: '振动传感器 VB-04', status: 'online', statusText: '在线', statusTone: 'ok',
+      kind: '振动传感器', unit: 'mm/s', value: '1.24',
+      workshop: '机加区', line: 'CNC-03', deviceCode: 'VB-04', time: '09:40', iconGlyph: '振',
     }),
     row({
-      id: 's5', code: 'S005', name: '液位', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '液位', unit: 'm', value: '2.85', threshold: '≤3.5 / ≥0.5',
-      scene: '反应釜区', point: '储槽-03', gateway: 'GW-03', interval: '10s', iconGlyph: '液',
+      id: 's5', code: 'CT-05', name: '电流传感器 CT-05', status: 'offline', statusText: '离线', statusTone: 'mute',
+      kind: '电流传感器', unit: 'A', value: '',
+      workshop: '车间 3', line: '配电室', deviceCode: 'CT-05', time: '', iconGlyph: '流',
     }),
     row({
-      id: 's6', code: 'S006', name: '电压', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '电压', unit: 'V', value: '219.4', threshold: '≤240 / ≥200',
-      scene: '能源动力区', point: '配电柜', gateway: 'GW-06', interval: '5s', iconGlyph: '压',
-    }),
-    row({
-      id: 's7', code: 'S007', name: '电流', status: 'ok', statusText: '正常', statusTone: 'ok',
-      kind: '电流', unit: 'A', value: '6.21', threshold: '≤10 / ≥1',
-      scene: 'CNC加工区', point: '主轴驱动', gateway: 'GW-03', interval: '5s', iconGlyph: '流',
-    }),
-    row({
-      id: 's8', code: 'S008', name: '振动', status: 'warn', statusText: '警告', statusTone: 'warn',
-      kind: '振动', unit: 'mm/s', value: '2.34', threshold: '≤4.0 / ≥0.1',
-      scene: 'CNC加工区', point: '主轴轴承', gateway: 'GW-03', interval: '2s', iconGlyph: '振',
-    }),
-    row({
-      id: 's9', code: 'S009', name: '烟感', status: 'bad', statusText: '报警', statusTone: 'bad',
-      kind: '烟感', unit: '%obs/m', value: '0.18', threshold: '≤0.10',
-      scene: '立体仓库', point: '货架区', gateway: 'GW-05', interval: '3s', iconGlyph: '烟',
+      id: 's6', code: 'SD-06', name: '烟感传感器 SD-06', status: 'alarm', statusText: '告警', statusTone: 'bad',
+      kind: '烟感传感器', unit: '%obs/m', value: '0.18', alarmHint: '浓度超限',
+      workshop: '仓库区', line: '货架通道', deviceCode: 'SD-06', time: '09:41', iconGlyph: '烟',
     }),
   ],
   'iot-alarm': [
@@ -169,19 +156,24 @@ export const FIXTURES: Record<string, FixtureRow[]> = {
   ],
   'iot-base': [
     row({
-      id: 'set1', code: 'collect', name: '采集周期', status: 'on', statusText: '开',
-      settingKey: 'collect', settingDesc: '设置设备数据采集的时间间隔',
-      settingTone: 'blue', group: '物联设置', iconGlyph: '采',
+      id: 'set1', code: 'network', name: '设备联网', status: 'on', statusText: '开',
+      settingKey: 'network', settingDesc: '连接工厂 Wi-Fi 网络',
+      settingTone: 'blue', settingOn: true, group: '物联设置', iconGlyph: '网',
     }),
     row({
-      id: 'set2', code: 'alarm-push', name: '报警推送', status: 'on', statusText: '开',
-      settingKey: 'alarm-push', settingDesc: '配置报警通知的推送方式和接收人',
-      settingTone: 'green', group: '物联设置', iconGlyph: '推',
+      id: 'set2', code: 'collect', name: '数据采集', status: 'on', statusText: '开',
+      settingKey: 'collect', settingDesc: '启用设备数据采集与上传',
+      settingTone: 'green', settingOn: true, group: '物联设置', iconGlyph: '采',
     }),
     row({
-      id: 'set3', code: 'gateway-timeout', name: '网关超时', status: 'on', statusText: '开',
-      settingKey: 'gateway-timeout', settingDesc: '设置网关通信超时的阈值和处理方式',
-      settingTone: 'purple', group: '物联设置', iconGlyph: '关',
+      id: 'set3', code: 'alarm-notify', name: '告警通知', status: 'on', statusText: '开',
+      settingKey: 'alarm-notify', settingDesc: '启用告警推送与提醒',
+      settingTone: 'purple', settingOn: true, group: '物联设置', iconGlyph: '告',
+    }),
+    row({
+      id: 'set4', code: 'remote', name: '远程维护', status: 'off', statusText: '关',
+      settingKey: 'remote', settingDesc: '允许远程访问与维护',
+      settingTone: 'orange', settingOn: false, group: '物联设置', iconGlyph: '维',
     }),
   ],
 };

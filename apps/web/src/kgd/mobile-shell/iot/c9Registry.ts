@@ -1,7 +1,7 @@
 import type { PlusItem } from '../types';
 
-/** C9 智能设备 · 物联 4 叶（DESIGN-MATRIX；缺口组临时皮，待 Allen 重选） */
-export type C9Layout = 'v4-detail-lines' | 'v3-status-tabs' | 'v1-settings';
+/** C9 智能设备 · 物联 4 叶（Allen 定版：scene/alarm 核对；sensor→版3；base→版5） */
+export type C9Layout = 'v4-detail-lines' | 'v3-status-tabs' | 'v5-switch-rows';
 
 export type C9StatusTab = { key: string; label: string };
 
@@ -15,8 +15,6 @@ export type C9LeafDef = {
   plus: PlusItem[] | null;
   searchHint: string;
   l1: 'iot';
-  /** 临时皮（PR 写「待 Allen 重选皮」；禁止上屏） */
-  tempSkin?: boolean;
   statusTabs?: C9StatusTab[];
 };
 
@@ -33,13 +31,12 @@ export const C9_LEAVES: C9LeafDef[] = [
     ],
     searchHint: '场景/网关/车间',
     l1: 'iot',
-    tempSkin: true,
   },
   {
     key: 'iot-sensor',
     title: '传感器',
     pcPath: '/device_sensor/list',
-    layout: 'v4-detail-lines',
+    layout: 'v3-status-tabs',
     listUrl: '/api/iot/sensors',
     plus: [
       { key: 'blank', label: '新增测点' },
@@ -47,7 +44,12 @@ export const C9_LEAVES: C9LeafDef[] = [
     ],
     searchHint: '编号/类型/点位',
     l1: 'iot',
-    tempSkin: true,
+    statusTabs: [
+      { key: 'all', label: '全部' },
+      { key: 'online', label: '在线' },
+      { key: 'offline', label: '离线' },
+      { key: 'alarm', label: '告警' },
+    ],
   },
   {
     key: 'iot-alarm',
@@ -61,7 +63,6 @@ export const C9_LEAVES: C9LeafDef[] = [
     ],
     searchHint: '场景/设备/级别',
     l1: 'iot',
-    tempSkin: true,
     statusTabs: [
       { key: 'all', label: '全部' },
       { key: 'open', label: '未处理' },
@@ -73,12 +74,11 @@ export const C9_LEAVES: C9LeafDef[] = [
     key: 'iot-base',
     title: '基础设置',
     pcPath: '/setting/smart_device/setting',
-    layout: 'v1-settings',
+    layout: 'v5-switch-rows',
     listUrl: null,
     plus: null,
     searchHint: '设置项',
     l1: 'iot',
-    tempSkin: true,
   },
 ];
 
