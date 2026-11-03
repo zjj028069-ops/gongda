@@ -13,14 +13,27 @@ function collectLeaves(nodes: MenuNode[]): MenuNode[] {
   return out;
 }
 
+function isPinnedGroup(node: MenuNode) {
+  return (
+    node.key === 'settings' ||
+    /setting|dict-menu|perf-pay|auto-stock|^station$|stock-audit|basics|company|sms|code-rules|personal/i.test(node.key) ||
+    /设置|基础配置|个人中心/.test(node.label)
+  );
+}
+
+/** 发现式列表：前 5 个业务入口 + 始终钉住系统设置/个人中心，保证 C8 双入口可点 */
 function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string } {
   const kids = menu.children ?? [];
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
-  const top = kids.slice(0, 5);
-  const rest = kids.slice(5).map((item) => item.label);
-  return { shown: top, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
+  const pinned = kids.filter(isPinnedGroup);
+  const others = kids.filter((node) => !isPinnedGroup(node));
+  const top = others.slice(0, menu.key === 'ai' ? 8 : 5);
+  const shownKeys = new Set([...top, ...pinned].map((n) => n.key));
+  const shown = [...top, ...pinned.filter((n) => !top.some((t) => t.key === n.key))];
+  const rest = kids.filter((n) => !shownKeys.has(n.key)).map((item) => item.label);
+  return { shown, overflow: rest.length ? `${rest.join(' / ')}…` : '' };
 }
 
 export function FunctionsTab() {
@@ -50,7 +63,9 @@ export function FunctionsTab() {
               aria-expanded={expanded}
               onClick={() => setOpenKey((prev) => (prev === menu.key ? null : menu.key))}
             >
-              <span className="ms-avatar sm" style={{ background: color }}>{glyphOf(menu.label)}</span>
+              <span className="ms-avatar sm" style={{ background: color }}>
+                {glyphOf(menu.label)}
+              </span>
               <span className="ms-fn-label">{menu.label}</span>
               <span className={`ms-chevron-wrap ${expanded ? 'down' : ''}`} aria-hidden>
                 <IconChevron />
@@ -64,8 +79,14 @@ export function FunctionsTab() {
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
-                        {nested.slice(0, 6).map((leaf) => (
-                          <button key={leaf.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(leaf, menu)}>
+                        {(isPinnedGroup(node) ? nested : nested.slice(0, 8)).map((leaf) => (
+                          <button
+                            key={leaf.key}
+                            type="button"
+                            className="ms-fn-sub"
+                            data-leaf-key={leaf.key}
+                            onClick={() => openLeaf(leaf, menu)}
+                          >
                             <i className="ms-dot" />
                             <span>
                               {leaf.label}
@@ -78,7 +99,13 @@ export function FunctionsTab() {
                     );
                   }
                   return (
-                    <button key={node.key} type="button" className="ms-fn-sub" onClick={() => openLeaf(node, menu)}>
+                    <button
+                      key={node.key}
+                      type="button"
+                      className="ms-fn-sub"
+                      data-leaf-key={node.key}
+                      onClick={() => openLeaf(node, menu)}
+                    >
                       <i className="ms-dot" />
                       <span>
                         {node.label}
