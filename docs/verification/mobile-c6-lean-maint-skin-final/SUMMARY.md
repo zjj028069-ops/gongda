@@ -1,0 +1,34 @@
+# mobile-c6-lean-maint-skin-final 验收
+
+- 版本：SEDRIC01 v1.0.107 / mobile-c6-lean-maint-skin-final
+- 基线：main = v1.0.106
+- 通过 27 / 27（叶子 17/17）
+- 未 merge、未上腾讯云、未重建库、未改密码
+
+- 通过 C6F-L01 ≤768 维保计划 · layout=v4-detail-lines;plus=1;locked=0
+- 通过 C6F-L02 ≤768 维保任务 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L03 ≤768 维保记录 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L04 ≤768 维保明细 · layout=v4-detail-lines;plus=1;locked=0
+- 通过 C6F-L05 ≤768 维保内容 · layout=v5-switch-rows;plus=1;locked=0
+- 通过 C6F-L06 ≤768 点检计划 · layout=v4-detail-lines;plus=1;locked=0
+- 通过 C6F-L07 ≤768 点检记录 · layout=v3-status-tabs;plus=1;locked=1
+- 通过 C6F-L08 ≤768 维修工单 · layout=v3-status-tabs;plus=1;locked=1
+- 通过 C6F-L09 ≤768 设备档案 · layout=v4-detail-lines;plus=1;locked=1
+- 通过 C6F-L10 ≤768 设备二维码 · layout=v3-status-tabs;plus=1;locked=1
+- 通过 C6F-L11 ≤768 维保设置 · layout=v5-switch-rows;plus=0;locked=0
+- 通过 C6F-L12 ≤768 精益生产工作站 · layout=v2-kpi;plus=0;locked=0
+- 通过 C6F-L13 ≤768 整改中心 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L14 ≤768 精益会议 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L15 ≤768 会议待办 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L16 ≤768 现场巡查 · layout=v3-status-tabs;plus=1;locked=0
+- 通过 C6F-L17 ≤768 精益生产设置 · layout=v5-switch-rows;plus=0;locked=0
+- 通过 C6F-PLUS 整改中心＋气泡贴在加号下方 · ＋新增整改
+- 通过 C6F-TABS 整改中心状态 Tab 过滤待整改 · all=6;wait=3
+- 通过 C6F-TASK-TABS 维保任务状态 Tab 过滤执行中 · doing-only
+- 通过 C6F-RECORD 维保记录对齐点检记录版3行卡 · record=v3;pi-record=v3
+- 通过 C6F-LOCKED 已定四叶不退版 · device-archive=v4-detail-lines;pi-record=v3-status-tabs;repair-order=v3-status-tabs;device-qr=v3-status-tabs
+- 通过 C6F-SWITCH 精益设置开关 toast · true->false 已关闭：生产计划管理
+- 通过 C6F-UPSTREAM 维保任务＋派工 → 完成(N) · 完成(1) 已选 1 项：注塑机周检计划
+- 通过 C6F-FN 功能树设备维保 11 + 精益 6 · device-11+lean-6
+- 通过 C6F-PC 窄屏 PC path → /ms/leaf · http://127.0.0.1:5173/ms/leaf?key=device-archive&title=%E8%AE%BE%E5%A4%87%E6%A1%A3%E6%A1%88&path=%2Fdevice%2Flist&l1=device
+- 通过 C6F-DESKTOP ≥769 不挂四栏壳 · shell=0;sidebar=1

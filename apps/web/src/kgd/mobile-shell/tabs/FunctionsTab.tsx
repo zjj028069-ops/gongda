@@ -18,8 +18,8 @@ function firstChildren(menu: PrimaryMenu): { shown: MenuNode[]; overflow: string
   if (!kids.length && menu.path) {
     return { shown: [{ key: menu.key, label: menu.label, path: menu.path }], overflow: '' };
   }
-  /** 物联 4 叶、客户 12 叶必须功能树可达，禁止 slice 挤掉 */
-  if (menu.key === 'iot' || menu.key === 'customer') {
+  /** 物联、客户、设备维保、精益叶子必须功能树可达，禁止 slice 挤掉 */
+  if (menu.key === 'iot' || menu.key === 'customer' || menu.key === 'device' || menu.key === 'lean') {
     return { shown: kids, overflow: '' };
   }
   const top = kids.slice(0, 5);
@@ -65,7 +65,7 @@ export function FunctionsTab() {
                 {shown.map((node) => {
                   const nested = node.children?.length ? collectLeaves(node.children) : [];
                   if (nested.length) {
-                    const shownLeaves = menu.key === 'customer' ? nested : nested.slice(0, 6);
+                    const shownLeaves = (menu.key === 'customer' || menu.key === 'device' || menu.key === 'lean') ? nested : nested.slice(0, 6);
                     return (
                       <div key={node.key} className="ms-fn-group">
                         <div className="ms-fn-group-title">{node.label}</div>
