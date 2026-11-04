@@ -34,10 +34,19 @@ import {
 } from './device-lean/c6Registry';
 import { DeviceLeanLeaf } from './device-lean/DeviceLeanLeaf';
 import { DeviceLeanUpstreamPick } from './device-lean/UpstreamPick';
+import {
+  c3LeafByKey,
+  c3LeafByPath,
+  isC3PurchaseKey,
+  msLeafUrl as c3MsLeafUrl,
+} from './purchase/c3Registry';
+import { PurchaseLeaf } from './purchase/PurchaseLeaf';
+import { PurchaseUpstreamPick } from './purchase/UpstreamPick';
 import './mobile-shell.css';
 import './iot/c9-iot.css';
 import './customer/c4-customer.css';
 import './device-lean/c6-device-lean.css';
+import './purchase/c3-purchase.css';
 
 function parseSearchScope(pathname: string): ShellTab | null {
   const m = pathname.match(/^\/ms\/search\/(messages|contacts|functions|settings)/);
@@ -62,6 +71,9 @@ export function MobileFourTabShell() {
   const isC6Leaf = isLeaf && (isC6DeviceLeanKey(leafKey) || !!c6LeafByPath(leafPath));
   const c6Key = isC6DeviceLeanKey(leafKey) ? leafKey : (c6LeafByPath(leafPath)?.key ?? '');
   const isC6Pick = isPick && (leafParams.get('scope') === 'c6' || isC6DeviceLeanKey(leafKey));
+  const isC3Leaf = isLeaf && (isC3PurchaseKey(leafKey) || !!c3LeafByPath(leafPath));
+  const c3Key = isC3PurchaseKey(leafKey) ? leafKey : (c3LeafByPath(leafPath)?.key ?? '');
+  const isC3Pick = isPick && (leafParams.get('scope') === 'c3' || isC3PurchaseKey(leafKey));
 
   /** PC 窄屏路径 → /ms 叶子；其它非 /ms 进消息栏 */
   useEffect(() => {
@@ -81,6 +93,11 @@ export function MobileFourTabShell() {
       navigate(c6MsLeafUrl(deviceLean), { replace: true });
       return;
     }
+    const purchase = c3LeafByPath(location.pathname);
+    if (purchase) {
+      navigate(c3MsLeafUrl(purchase), { replace: true });
+      return;
+    }
     navigate(TAB_PATH.messages, { replace: true });
   }, [location.pathname, navigate]);
 
@@ -91,6 +108,8 @@ export function MobileFourTabShell() {
     if (customer) return <Navigate to={c4MsLeafUrl(customer)} replace />;
     const deviceLean = c6LeafByPath(location.pathname);
     if (deviceLean) return <Navigate to={c6MsLeafUrl(deviceLean)} replace />;
+    const purchase = c3LeafByPath(location.pathname);
+    if (purchase) return <Navigate to={c3MsLeafUrl(purchase)} replace />;
     return <Navigate to={TAB_PATH.messages} replace />;
   }
 
@@ -122,8 +141,11 @@ export function MobileFourTabShell() {
       }
     }
     if (item.key === 'add-supplier') {
-      navigate('/ms/leaf?key=supplier&title=' + encodeURIComponent('新增供应商') + '&path=' + encodeURIComponent('/supplier/list'));
-      return;
+      const supplier = c3LeafByKey('supplier');
+      if (supplier) {
+        navigate(c3MsLeafUrl(supplier, { action: 'blank' }));
+        return;
+      }
     }
     const c9 = c9LeafByKey(item.key);
     if (c9) {
@@ -138,6 +160,11 @@ export function MobileFourTabShell() {
     const deviceLean = c6LeafByKey(item.key);
     if (deviceLean) {
       navigate(c6MsLeafUrl(deviceLean));
+      return;
+    }
+    const purchase = c3LeafByKey(item.key);
+    if (purchase) {
+      navigate(c3MsLeafUrl(purchase));
       return;
     }
     navigate(`/ms/leaf?key=${encodeURIComponent(item.key)}&title=${encodeURIComponent(item.label)}`);
@@ -155,6 +182,7 @@ export function MobileFourTabShell() {
       data-c9={isC9Leaf ? 'iot' : undefined}
       data-c4={isCustomerLeaf || isC4Pick ? 'customer' : undefined}
       data-c6={isC6Leaf || isC6Pick ? 'device-lean' : undefined}
+      data-c3={isC3Leaf || isC3Pick ? 'purchase' : undefined}
     >
       {showChrome && (
         <MobileTopBar
@@ -169,10 +197,12 @@ export function MobileFourTabShell() {
         {searchScope && <SearchPage scope={searchScope} />}
         {!searchScope && isPick && isC4Pick && <CustomerUpstreamPick />}
         {!searchScope && isPick && isC6Pick && <DeviceLeanUpstreamPick />}
+        {!searchScope && isPick && isC3Pick && <PurchaseUpstreamPick />}
         {!searchScope && isLeaf && isC9Leaf && <IotLeaf leafKey={c9Key} />}
         {!searchScope && isLeaf && isCustomerLeaf && <CustomerLeaf leafKey={customerKey} />}
         {!searchScope && isLeaf && isC6Leaf && <DeviceLeanLeaf leafKey={c6Key} />}
-        {!searchScope && isLeaf && !isC9Leaf && !isCustomerLeaf && !isC6Leaf && <LeafPlaceholder />}
+        {!searchScope && isLeaf && isC3Leaf && <PurchaseLeaf leafKey={c3Key} />}
+        {!searchScope && isLeaf && !isC9Leaf && !isCustomerLeaf && !isC6Leaf && !isC3Leaf && <LeafPlaceholder />}
         {!searchScope && !deep && tab === 'messages' && <MessagesTab />}
         {!searchScope && !deep && tab === 'contacts' && <ContactsTab />}
         {!searchScope && !deep && tab === 'functions' && <FunctionsTab />}

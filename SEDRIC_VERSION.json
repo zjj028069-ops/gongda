@@ -1,21 +1,20 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.107",
-  "display": "SEDRIC01 v1.0.107",
-  "feature": "mobile-c6-lean-maint-skin-final",
-  "hotfix": "20261103-mobile-c6-lean-maint-skin-final",
+  "version": "1.0.108",
+  "display": "SEDRIC01 v1.0.108",
+  "feature": "mobile-c3-purchase-skin-final",
+  "hotfix": "20261104-mobile-c3-purchase-skin-final",
   "primary": "#4184F4",
-  "released_at": "2026-11-04T08:00:00+08:00",
+  "released_at": "2026-11-04T12:30:00+08:00",
   "features": [
-    "精益 6 叶定版：工作站版2关键KPI；整改/会议/待办/巡查版3状态Tabs；精益设置版5极简开关行",
-    "维保缺口：任务与记录版3状态Tabs；内容与维保设置版5极简开关行；计划/明细/点检计划维持版4明细行卡",
-    "已定四叶保持：设备档案版4、点检记录版3、维修工单版3、设备二维码版3",
+    "C3 供应/采购 12 叶定版：供应商版2关键字段；计划/采购单/检验明细版4明细行卡；付款与发票版2金额优先；检验单版2结果优先；规范与三项设置版5极简；价格追踪版2现价/变动",
+    "采购单加商品保留三入口：选择采购商品、选择采购计划商品、选择合同商品",
     "路由 /ms/leaf?key=…；≤768 四栏壳；顶栏细线放大镜；＋气泡贴加号下；≥769 PC 不动",
-    "基线 GitHub main = v1.0.106；未合入、未上腾讯云、不重建库、不改密码"
+    "基线 GitHub main = v1.0.107；未合入、未上腾讯云、不重建库、不改密码"
   ],
-  "note": "基线=v1.0.106 mobile-c4-customer-skin-final；本功能=v1.0.107 mobile-c6-lean-maint-skin-final；不重建库、不改密码、不上云",
-  "prev": "1.0.106 mobile-c4-customer-skin-final",
-  "tag": "mobile-c6-lean-maint-skin-final",
-  "baseline": "1.0.106",
-  "baseline_commit": "ba439be"
+  "note": "基线=v1.0.107 mobile-c6-lean-maint-skin-final；本功能=v1.0.108 mobile-c3-purchase-skin-final；不重建库、不改密码、不上云",
+  "prev": "1.0.107 mobile-c6-lean-maint-skin-final",
+  "tag": "mobile-c3-purchase-skin-final",
+  "baseline": "1.0.107",
+  "baseline_commit": "bb199a5"
 }

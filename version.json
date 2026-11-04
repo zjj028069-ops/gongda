@@ -1,9 +1,9 @@
 {
   "product": "SEDRIC01",
-  "version": "1.0.107",
-  "display": "SEDRIC01 v1.0.107",
-  "feature": "mobile-c6-lean-maint-skin-final",
-  "hotfix": "20261103-mobile-c6-lean-maint-skin-final",
+  "version": "1.0.108",
+  "display": "SEDRIC01 v1.0.108",
+  "feature": "mobile-c3-purchase-skin-final",
+  "hotfix": "20261104-mobile-c3-purchase-skin-final",
   "primary": "#4184F4",
-  "note": "mobile-c6-lean-maint-skin-final on baseline v1.0.106"
+  "note": "mobile-c3-purchase-skin-final on baseline v1.0.107"
 }
